@@ -1,11 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from rautils import dB, distance, sol, create_array_pos
+from rautils import dB, distance, sol, create_array_pos, car2sph
 from scipy import integrate
 
 
 class PyramidalHorn:
-    def __init__(self, r1, r2, a, b, a1, b1, E0, k0):
+    def __init__(self, r1, r2, a, b, a1, b1, E0, freq):
+        k0 = 2 * np.pi / (sol / freq)
+
         self.r1 = r1
         self.r2 = r2
         self.a = a
@@ -15,22 +17,29 @@ class PyramidalHorn:
         self.E0 = E0
         self.k0 = k0
         self.rz = 1
+        self.freq = freq
+
+    def have_input_power(self):
+        return True
+
+    def frequency(self):
+        return self.freq
+
+    def get_k0(self):
+        return self.k0
 
     def integ_func(self, t, p):
         R = 100.
-        _, et, ep = self.pattern_at_rtp(R, t, p)
+        _, et, ep = self.efield_at_rtp(R, t, p)
         etp = np.sqrt(et**2 + ep**2)
         return np.abs(etp)**2 *R*R*np.sin(t)
 
-    def pattern_at_xyz(self, x, y, z):
-        r = np.sqrt(x*x+y*y+z*z)
-        theta = np.arccos(z/r)
-        phi = np.arctan2(y, x)
-
-        return self.pattern_at_rtp(r, theta, phi)
+    def efield_at_xyz(self, x, y, z):
+        r, theta, phi = car2sph(x, y, z)
+        return self.efield_at_rtp(r, theta, phi)
 
 
-    def pattern_at_rtp(self, r, theta, phi):
+    def efield_at_rtp(self, r, theta, phi):
         k = 2*np.pi
         ky = k * np.sin(theta)*np.sin(phi)
         t1 = np.sqrt(1/(np.pi*k*self.r1)) * (-k*self.b1/2-ky*self.r1)
@@ -160,21 +169,23 @@ def get_horn_input_power(horn):
     ret = integrate.nquad(horn.integ_func, [[0, np.pi/2.], [0, np.pi*2]])
     return ret[0]
 
+def get_default_pyramidal_horn(freq):
+    return PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, freq)
+
 
 if __name__ == '__main__':
     f = 5.0e9
-    k0 = 2*np.pi / (sol / f)
     cell_sz = 15. / 1000.
     scale = 50
     z = 0.6
 
-    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, k0)
+    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f)
     xl, yl = create_array_pos(cell_sz, scale, scale, ex=True)
     magE = np.ndarray((len(yl), len(xl)))
     pE = np.ndarray((len(yl), len(xl)))
     for (yi, y) in list(enumerate(yl)):
         for (xi, x) in list(enumerate(xl)):
-            Exyz, _, _ = phorn.pattern_at_xyz(x, y, z)
+            Exyz, _, _ = phorn.efield_at_xyz(x, y, z)
             mag = np.sqrt(Exyz.item(0)**2 + Exyz.item(1)**2 + Exyz.item(2)**2)
             pha = np.angle(Exyz.item(1))
             #print(mag, pha)
@@ -189,4 +200,3 @@ if __name__ == '__main__':
     plt.pcolor(xl, yl, pE)
     plt.show()
 
-    #print(get_horn_input_power(phorn))

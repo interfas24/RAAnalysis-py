@@ -18,6 +18,9 @@ class BeamForming:
         self.ypos = ypos
         self.fpos = fpos
 
+    def frequency(self):
+        return self.freq
+
     def __get_phi_n(self, theta, phi, x, y):
         return -self.k0 * np.sin(theta) * np.cos(phi) * x - self.k0 * np.sin(theta) * np.sin(phi) * y
 
@@ -73,7 +76,7 @@ class BeamForming:
                     ret[yidx][xidx] = (np.angle(sum) + 2*np.pi) % (2*np.pi)
         return ret
 
-    def form_oam_beam(self, tpm, haskd=True, alpha=0.0):
+    def form_oam_beam(self, tpm, alpha=0.0, haskd=True):
         """
         :param tpm:
         :param haskd:
