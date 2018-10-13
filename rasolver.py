@@ -81,7 +81,7 @@ def test1():
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     src = Source()
     src.append(get_default_pyramidal_horn(freq), abg, (0., 0., 0.5))
-    tp = [(np.deg2rad(30), np.deg2rad(0))]
+    tp = [(np.deg2rad(10), np.deg2rad(0))]
     tpm = [(np.deg2rad(0), np.deg2rad(0), 1)]
     foci = [(0, 0, 0.8, 1.0)]
 

@@ -10,7 +10,7 @@ class BeamForming:
             freq    unit:Hz
             xpos    x-axis element position list unit:m
             ypos    y-axis element position list unit:m
-            fpos    feed position tuple, list etc   unit:m
+            fpos    feed position tuple, list etc. or None for plane wave   unit:m
         """
         self.freq = freq
         self.k0 = 2 * np.pi / (sol / freq)
@@ -24,7 +24,6 @@ class BeamForming:
     def __get_phi_n(self, theta, phi, x, y):
         return -self.k0 * np.sin(theta) * np.cos(phi) * x - self.k0 * np.sin(theta) * np.sin(phi) * y
 
-
     def __feed_phase(self, x, y):
         sum = 0.0j
         for (fx, fy, fz) in self.fpos:
@@ -32,10 +31,8 @@ class BeamForming:
             sum += np.exp(1j*df*self.k0)
         return np.angle(sum) + np.pi*2
 
-
     def __get_phi_k(self, theta, phi, x, y):
         return np.arctan2(-np.cos(theta)*np.sin(phi)*x + np.cos(theta)*np.cos(phi)*y, np.cos(phi)*x + np.sin(phi)*y)
-
 
     def form_pencil_beam(self, tp, haskd=True):
         """
@@ -51,18 +48,16 @@ class BeamForming:
                     phi_n = self.__get_phi_n(t, p, x, y)
                     sum += np.exp(1j*phi_n)
                 if haskd:
-                    #ret[yidx][xidx] = (np.angle(sum) + self.k0*distance(self.fpos, (x, y, 0.0))) % (2*np.pi)
                     ret[yidx][xidx] = (np.angle(sum) + self.__feed_phase(x, y)) % (2*np.pi)
                 else:
                     ret[yidx][xidx] = (np.angle(sum) + 2*np.pi) % (2*np.pi)
         return ret
 
-
     def form_focal_beam(self, focals, haskd=True):
         """
         :param focals: [(dx1, dy1, dz1, D1), (dx2, dy2, dz2, D2), ...]
-        :param haskd:
-        :return:
+        :param haskd: use kd with fpos
+        :return: np.ndarray unit rad
         """
         ret = np.ndarray((len(self.ypos), len(self.xpos)))
         for (yidx, y) in list(enumerate(self.ypos)):
@@ -76,12 +71,12 @@ class BeamForming:
                     ret[yidx][xidx] = (np.angle(sum) + 2*np.pi) % (2*np.pi)
         return ret
 
-    def form_oam_beam(self, tpm, alpha=0.0, haskd=True):
+    def form_oam_beam(self, tpm, beta=0.0, haskd=True):
         """
-        :param tpm:
-        :param haskd:
-        :param focal:
-        :return:
+        :param tpm: [(t1, p1, m1), (t2, p2, m2), ...]
+        :beta: no diffraction OAM angle unit: rad
+        :param haskd: use kd with fpos
+        :return: np.ndarray unit rad
         """
         ret = np.ndarray((len(self.ypos), len(self.xpos)))
         for (yidx, y) in list(enumerate(self.ypos)):
@@ -89,18 +84,18 @@ class BeamForming:
                 sum = 0.0j
                 for (t, p, mode) in tpm:
                     pn = self.__get_phi_n(t, p, x, y)
-                    pk = self.__get_phi_k(t, p, x, y)
+                    pk = self.__get_phi_k(t, p, x, y) * mode
                     big_phi = pn + pk
                     sum += np.exp(1j*(big_phi))
                 if haskd:
-                    ret[yidx][xidx] = (np.angle(sum) + self.__feed_phase(x, y) + np.sqrt(x*x+y*y)*np.sin(alpha)*self.k0)\
+                    ret[yidx][xidx] = (np.angle(sum) + self.__feed_phase(x, y) + np.sqrt(x*x+y*y)*np.sin(beta)*self.k0)\
                                       % (2*np.pi)
                 else:
-                    ret[yidx][xidx] = (np.angle(sum) + 2*np.pi + np.sqrt(x*x+y*y)*np.sin(alpha)*self.k0) % (2*np.pi)
+                    ret[yidx][xidx] = (np.angle(sum) + 2*np.pi + np.sqrt(x*x+y*y)*np.sin(beta)*self.k0) % (2*np.pi)
         return ret
 
 
-if __name__ == '__main__':
+def multi_test():
     f = 10.0e9
     cell_sz = 15.0 / 1000.
     scale = 20
@@ -122,12 +117,15 @@ if __name__ == '__main__':
     plt.figure()
     plt.pcolor(xlex, ylex, fb)
 
-    tpm = [(np.deg2rad(0), np.deg2rad(0), 1)]
-    ob = bf.form_oam_beam(tpm, alpha=np.deg2rad(10))
+    tpm = [(np.deg2rad(0), np.deg2rad(0), 2)]
+    ob = bf.form_oam_beam(tpm, beta=np.deg2rad(10))
     plt.figure()
     plt.pcolor(xlex, ylex, ob)
     plt.show()
 
+
+if __name__ == '__main__':
+    multi_test()
 
 
 

@@ -44,9 +44,21 @@ class RAInfo:
         key, val = kv
         fpos = [p for _, _, p in src] if src.is_horn() else None
         bf = BeamForming(src.frequency(), xl, yl, fpos)
-        phase = []
         if key == 'file':
-            pass
+            ret = []
+            distro = open(val)
+            for line in distro.readlines():
+                sline = line.split()
+                #v = [int(x) for x in sline]
+                v = []
+                for num in sline:
+                    if int(num) == 1:
+                        v.append(np.pi)
+                    else:
+                        v.append(0.0)
+                ret.append(v)
+            distro.close()
+            phase = np.array(ret)
         elif key == 'pencil':
             phase = bf.form_pencil_beam(val, fpos != None)
         elif key == 'oam':
@@ -58,6 +70,7 @@ class RAInfo:
             print('Error phase distribution')
             raise ValueError
 
+        print(phase)
         allp = phase.flatten()
         #TODO: circle board
 

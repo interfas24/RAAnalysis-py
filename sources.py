@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 class PlaneWave:
     def __init__(self, freq):
         k0 = 2 * np.pi / (sol / freq)
-        self.e0 = 1.0
+        self.e0 = 200.0
         self.k0 = k0
         self.freq = freq
 
     def frequency(self):
         return self.freq
 
-    def k0(self):
+    def get_k0(self):
         return self.k0
 
     def have_input_power(self):
