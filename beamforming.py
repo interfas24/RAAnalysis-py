@@ -110,17 +110,20 @@ def multi_test():
     beam_dir = [(np.deg2rad(0), np.deg2rad(0))]
     pb = bf.form_pencil_beam(beam_dir, True)
     plt.figure()
-    plt.pcolor(xlex, ylex, pb)
+    plt.pcolor(xlex, ylex, np.rad2deg(pb), cmap='jet')
+    plt.colorbar()
 
     focals = [(0.0, 0.0, 0.5, 1)]
     fb = bf.form_focal_beam(focals)
     plt.figure()
-    plt.pcolor(xlex, ylex, fb)
+    plt.pcolor(xlex, ylex, np.rad2deg(fb), cmap='jet')
+    plt.colorbar()
 
     tpm = [(np.deg2rad(0), np.deg2rad(0), 2)]
     ob = bf.form_oam_beam(tpm, beta=np.deg2rad(10))
     plt.figure()
-    plt.pcolor(xlex, ylex, ob)
+    plt.pcolor(xlex, ylex, np.rad2deg(ob), cmap='jet')
+    plt.colorbar()
     plt.show()
 
 

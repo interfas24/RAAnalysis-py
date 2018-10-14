@@ -70,7 +70,6 @@ class RAInfo:
             print('Error phase distribution')
             raise ValueError
 
-        print(phase)
         allp = phase.flatten()
         #TODO: circle board
 

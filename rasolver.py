@@ -1,7 +1,7 @@
-from hornpattern import PyramidalHorn, get_default_pyramidal_horn
+from hornpattern import PyramidalHorn, get_default_pyramidal_horn, get_horn_input_power
 from arrayinfo import RAInfo
 from sources import PlaneWave, Source
-from rautils import gsinc, ideal_ref_unit, dB
+from rautils import gsinc, ideal_ref_unit, dB, sph2car_mtx, make_v_mtx, farR
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,8 +13,36 @@ import matplotlib.pyplot as plt
 5. calc
 """
 
+class EfieldResult:
+    def __init__(self, Etheta, Ephi, pos):
+        (r, t, p) = pos
+        self.Etheta = Etheta
+        self.Ephi = Ephi
+        self.Pos = pos
+        self.Etotal = np.sqrt(Etheta*Etheta + Ephi*Ephi)
+        xyz_mtx = sph2car_mtx(t, p) * make_v_mtx(0j, Etheta, Ephi)
+        self.Ex = xyz_mtx.item(0)
+        self.Ey = xyz_mtx.item(1)
+        self.Ez = xyz_mtx.item(2)
+
+    def get_etotal(self):
+        return self.Etotal
+
+    def get_sph_field(self):
+        return 0j, self.Etheta, self.Ephi
+
+    def get_car_field(self):
+        return self.Ex, self.Ey, self.Ez
+
+    def get_directivity(self):
+        (r, t, p) = self.Pos
+        return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*377.)
+
+    def get_gain(self, ipower):
+        return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / ipower
+
+
 class RASolver:
-    R = 100.
 
     def __init__(self, rainfo):
         self.rainfo = rainfo
@@ -46,9 +74,8 @@ class RASolver:
         R = r
         E_phi = -1j*k0*np.exp(-1j*k0*R)/(2*np.pi*R)*np.cos(t) * (Erx * np.sin(p) - Ery * np.cos(p))
         E_theta = 1j*k0*np.exp(-1j*k0*R)/(2*np.pi*R) * (Erx * np.cos(p) + Ery * np.sin(p))
-        E_total = np.sqrt(E_phi*E_phi + E_theta*E_theta)
 
-        return np.abs(E_total)*np.abs(E_total)*R*R / (2 * 377.)
+        return EfieldResult(E_theta, E_phi, (r, t, p))
 
 
     def append_task(self):
@@ -65,11 +92,14 @@ class RASolver:
 
         res = []
         for t in ts:
-            #print(np.rad2deg(t))
-            res.append(self.__calc_one_point(100., t, ps))
-        res = dB(res)
+            res.append(self.__calc_one_point(farR, t, ps))
+        et = []
+        integ = 22732.769823328235
+        for x in res:
+            et.append(x.get_gain(integ))
+        et = dB(et)
         plt.figure()
-        plt.plot(np.rad2deg(ts), res)
+        plt.plot(np.rad2deg(ts), et)
         plt.show()
 
 
@@ -80,12 +110,13 @@ def test1():
 
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     src = Source()
-    src.append(get_default_pyramidal_horn(freq), abg, (0., 0., 0.5))
+    horn = get_default_pyramidal_horn(freq)
+    src.append(horn, abg, (0., 0., 0.5))
     tp = [(np.deg2rad(10), np.deg2rad(0))]
-    tpm = [(np.deg2rad(0), np.deg2rad(0), 1)]
+    tpm = [(np.deg2rad(20), np.deg2rad(0), 1)]
     foci = [(0, 0, 0.8, 1.0)]
 
-    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tp), ideal_ref_unit)
+    arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
     solver = RASolver(arr)
     solver.test()
 

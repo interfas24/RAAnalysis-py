@@ -2,6 +2,7 @@ import numpy as np
 
 
 sol = 299792458   # speed of light    unit:m/s
+farR = 1e5
 
 def distance(pt1, pt2):
     return np.sqrt((pt1[0]-pt2[0])**2 + (pt1[1]-pt2[1])**2 + (pt1[2]-pt2[2])**2)
