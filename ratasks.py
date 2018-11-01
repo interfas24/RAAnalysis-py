@@ -15,7 +15,7 @@ class Task:
         self.cnt = 0
 
     def __len__(self):
-        return len(self.results)
+        return len(self.pos)
 
     def __iter__(self):
         self.cnt = 0
@@ -45,7 +45,6 @@ class FarZone:
         self.col = col
         self.nrow = len(row)
         self.ncol = len(col)
-        #self.alldat = np.array(shape=(1, self.nrow*self.ncol), dtype=EfieldResult)
         self.alldat = np.empty(self.nrow*self.ncol, dtype=EfieldResult)
 
     def __len__(self):
@@ -82,12 +81,14 @@ class FarZone:
                         pos = []
                         b = e
             tsk.append(Task((b, e), pos))
+            return tsk
 
 
 class Gain2D(FarZone):
     def __init__(self, phi, ntheta):
         ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
-        FarZone.__init__(self, [phi], ts)
+        super().__init__([phi], ts)
+
 
 class Gain3D(FarZone):
     pass
@@ -100,3 +101,16 @@ class Directivity3D(FarZone):
 
 class FresnelPlane:
     pass
+
+
+if __name__ == '__main__':
+    g2d = Gain2D(np.deg2rad(0), 100.)
+    tsks = g2d.assign_task()
+
+    for (i, tsk) in list(enumerate(tsks)):
+        print('in task {}'.format(i))
+        for (r, t, p) in tsk:
+            print('r={},t={},p={}'.format(r, t, p))
+        print('\n')
+
+
