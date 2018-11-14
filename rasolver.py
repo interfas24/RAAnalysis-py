@@ -112,14 +112,33 @@ def test1():
     src = Source()
     horn = get_default_pyramidal_horn(freq)
     src.append(horn, abg, (0., 0., 0.5))
-    tp = [(np.deg2rad(10), np.deg2rad(0))]
+    tp = [(np.deg2rad(0), np.deg2rad(0))]
     tpm = [(np.deg2rad(20), np.deg2rad(0), 1)]
     foci = [(0, 0, 0.8, 1.0)]
 
-    arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
+    #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
+    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tp), ideal_ref_unit)
     solver = RASolver(arr)
     solver.test()
 
+def test2():
+    freq = 5e9
+    cell_sz = 30. / 1000.
+    scale = 20
+
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    src = Source()
+    horn = get_default_pyramidal_horn(freq)
+    src.append(horn, abg, (0., 0., 0.5))
+    tp = [(np.deg2rad(0), np.deg2rad(0))]
+    tpm = [(np.deg2rad(20), np.deg2rad(0), 1)]
+    foci = [(0, 0, 0.8, 1.0)]
+
+    #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
+    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tp), lambda p:ideal_ref_unit(p, bits=3))
+    solver = RASolver(arr)
+    solver.test()
 
 if __name__ == '__main__':
     test1()
+    test2()

@@ -87,10 +87,15 @@ def R2F(alpha, beta, gamma):
 def F2R(alpha, beta, gamma):
     return R2F(alpha, beta, gamma).transpose()
 
-def ideal_ref_unit(pha, amp=1.0):
+def ideal_ref_unit(pha, amp=1.0, bits=None):
     ret = []
     for i in range(len(pha)):
-        ret.append((amp*np.exp(1j*pha[i]), 0j, 0j, 1+0j))
+        sp = pha[i]
+        if bits != None:
+            step = np.pi*2/(2**bits)
+            sp = int(pha[i]/step) * step
+        ret.append((amp*np.exp(1j*sp), 0j, 0j, 1+0j))
+
     return ret
 
 
