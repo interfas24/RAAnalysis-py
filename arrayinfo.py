@@ -3,6 +3,7 @@ from sources import Source
 from hornpattern import get_default_pyramidal_horn
 from beamforming import BeamForming
 import numpy as np
+import threading
 
 import matplotlib.pyplot as plt
 
@@ -97,19 +98,23 @@ class RAInfo:
             axy = tc*np.matrix([[a1], [a2]])
             self.efield.append((axy.item(0), axy.item(1)))
 
+        self.lock = threading.Lock()
+
     def __len__(self):
         return len(self.efield)
 
     def __iter__(self):
-        self.idx = 0
-        return self
+        with self.lock:
+            self.idx = 0
+            return self
 
     def __next__(self):
-        if self.idx == len(self):
-            raise StopIteration
-        ret = self.efield[self.idx]
-        self.idx += 1
-        return ret
+        with self.lock:
+            if self.idx == len(self):
+                raise StopIteration
+            ret = self.efield[self.idx]
+            self.idx += 1
+            return ret
 
 
 if __name__ == '__main__':

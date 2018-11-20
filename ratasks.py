@@ -1,6 +1,36 @@
 import numpy as np
-from rasolver import EfieldResult
-from rautils import farR
+from rautils import farR, sph2car_mtx, make_v_mtx, dB
+import threading
+
+import matplotlib.pyplot as plt
+
+class EfieldResult:
+    def __init__(self, Etheta, Ephi, pos):
+        (r, t, p) = pos
+        self.Etheta = Etheta
+        self.Ephi = Ephi
+        self.Pos = pos
+        self.Etotal = np.sqrt(Etheta*Etheta + Ephi*Ephi)
+        xyz_mtx = sph2car_mtx(t, p) * make_v_mtx(0j, Etheta, Ephi)
+        self.Ex = xyz_mtx.item(0)
+        self.Ey = xyz_mtx.item(1)
+        self.Ez = xyz_mtx.item(2)
+
+    def get_etotal(self):
+        return self.Etotal
+
+    def get_sph_field(self):
+        return 0j, self.Etheta, self.Ephi
+
+    def get_car_field(self):
+        return self.Ex, self.Ey, self.Ez
+
+    def get_directivity(self):
+        (r, t, p) = self.Pos
+        return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*377.)
+
+    def get_gain(self, ipower):
+        return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / ipower
 
 class TaskState:
     Pending = 1
@@ -11,25 +41,29 @@ class Task:
     def __init__(self, oid, pos):
         self.oid = oid
         self.pos = pos
-        self.results = np.array(len(pos), dtype=EfieldResult)
+        self.results = np.empty(len(pos), dtype=EfieldResult)
         self.cnt = 0
+        self.lock = threading.Lock()
 
     def __len__(self):
         return len(self.pos)
 
     def __iter__(self):
-        self.cnt = 0
-        return self
+        with self.lock:
+            self.cnt = 0
+            return self
 
     def __next__(self):
-        if self.cnt == len(self):
-            raise StopIteration
-        ret = self.pos[self.cnt]
-        self.cnt += 1
-        return ret
+        with self.lock:
+            if self.cnt == len(self):
+                raise StopIteration
+            ret = self.pos[self.cnt]
+            self.cnt += 1
+            return ret
 
     def set_current_result(self, efield):
-        self.results[self.cnt-1] = efield
+        with self.lock:
+            self.results[self.cnt-1] = efield
 
     def get_old_idx(self):
         return self.oid
@@ -46,23 +80,30 @@ class FarZone:
         self.nrow = len(row)
         self.ncol = len(col)
         self.alldat = np.empty(self.nrow*self.ncol, dtype=EfieldResult)
+        self.lock = threading.Lock()
 
     def __len__(self):
         return self.nrow * self.ncol
 
+    """
     def __setitem__(self, key, value):
-        if key > len(self):
-            print('index exceeds')
-            raise ValueError
-        self.alldat[key] = value
+        with self.lock:
+            if key > len(self):
+                print('index exceeds')
+                raise ValueError
+            self.alldat[key] = value
+    """
 
+    """
     def __getitem__(self, item):
         return self.alldat[item]
+    """
 
     def set_results(self, tsk):
-        b, e = tsk.get_old_idx()
-        for i in range(b, e):
-            self.alldat.put(i, tsk.get_results()[i-b])
+        with self.lock:
+            b, e = tsk.get_old_idx()
+            for i in range(b, e):
+                self.alldat.put(i, tsk.get_results()[i-b])
 
     def assign_task(self, mp=200):
         if len(self) <= mp:
@@ -89,9 +130,36 @@ class Gain2D(FarZone):
         ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
         super().__init__([phi], ts)
 
+    def post_process(self):
+        fields = np.reshape(self.alldat, (self.nrow, self.ncol))
+        print(fields)
+        integ = 22732.769823328235
+        gs = [x.get_gain(integ) for x in fields[0]]
+        gs = dB(gs)
+
+        plt.figure()
+        plt.plot(self.col, gs)
+        plt.show()
+
 
 class Gain3D(FarZone):
-    pass
+    def __init__(self, nphi, ntheta):
+        ps = np.linspace(0, np.pi*2, nphi)
+        ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
+        super().__init__(ps, ts)
+
+    def post_process(self):
+        fields = np.reshape(self.alldat, (self.nrow, self.ncol))
+        #print(fields)
+        id = int(self.nrow / 2)
+        integ = 22732.769823328235
+        gs = [x.get_gain(integ) for x in fields[10]]
+        gs = dB(gs)
+
+        plt.figure()
+        plt.plot(self.col, gs)
+        plt.show()
+
 
 class Directivity2D(FarZone):
     pass

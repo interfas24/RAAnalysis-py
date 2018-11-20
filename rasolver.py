@@ -2,8 +2,12 @@ from hornpattern import PyramidalHorn, get_default_pyramidal_horn, get_horn_inpu
 from arrayinfo import RAInfo
 from sources import PlaneWave, Source
 from rautils import gsinc, ideal_ref_unit, dB, sph2car_mtx, make_v_mtx, farR
+from ratasks import Gain2D, Gain3D, EfieldResult
 import numpy as np
 import matplotlib.pyplot as plt
+import time
+import concurrent.futures
+import threading
 
 """
 1. array info (cell size scale | horns)
@@ -13,39 +17,12 @@ import matplotlib.pyplot as plt
 5. calc
 """
 
-class EfieldResult:
-    def __init__(self, Etheta, Ephi, pos):
-        (r, t, p) = pos
-        self.Etheta = Etheta
-        self.Ephi = Ephi
-        self.Pos = pos
-        self.Etotal = np.sqrt(Etheta*Etheta + Ephi*Ephi)
-        xyz_mtx = sph2car_mtx(t, p) * make_v_mtx(0j, Etheta, Ephi)
-        self.Ex = xyz_mtx.item(0)
-        self.Ey = xyz_mtx.item(1)
-        self.Ez = xyz_mtx.item(2)
-
-    def get_etotal(self):
-        return self.Etotal
-
-    def get_sph_field(self):
-        return 0j, self.Etheta, self.Ephi
-
-    def get_car_field(self):
-        return self.Ex, self.Ey, self.Ez
-
-    def get_directivity(self):
-        (r, t, p) = self.Pos
-        return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*377.)
-
-    def get_gain(self, ipower):
-        return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / ipower
-
-
 class RASolver:
 
     def __init__(self, rainfo):
         self.rainfo = rainfo
+        self.tasks = []
+        self.lock = threading.Lock()
 
     def __erxy_fft(self, u, v):
         px, py = self.rainfo.get_pxy()
@@ -78,12 +55,43 @@ class RASolver:
         return EfieldResult(E_theta, E_phi, (r, t, p))
 
 
-    def append_task(self):
-        pass
+    # add far zone task
+    def append_task(self, tsk):
+        self.tasks.append(tsk)
 
+    # iterate on tasks, each task use multi-threading
     def run(self):
+        for task in self.tasks:
+            field_task = task.assign_task()
+            start_time = time.clock()
+            for tsk in field_task:
+                for (r, t, p) in tsk:
+                    tsk.set_current_result(self.__calc_one_point(r, t, p))
+                task.set_results(tsk)
+            print(time.clock()-start_time, "sec")
 
-        pass
+    # calc a task in a thread
+    def __calc_one_task__(self, tsk):
+        #with self.lock:
+            for (r, t, p) in tsk:
+                tsk.set_current_result(self.__calc_one_point(r, t, p))
+            return tsk
+
+    # Bugs here
+    def run_concurrency(self):
+        for task in self.tasks:
+            field_task = task.assign_task()
+            start_time = time.clock()
+            tsk_list = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as e:
+                for tsk in field_task:
+                    print(type(tsk))
+                    e.submit(self.__calc_one_task__, tsk)
+                    tsk_list.append(tsk)
+            print(time.clock()-start_time, "sec")
+
+            for t in tsk_list:
+                task.set_results(t)
 
     def test(self):
         N = 300
@@ -139,6 +147,33 @@ def test2():
     solver = RASolver(arr)
     solver.test()
 
+def test_multi():
+    freq = 5e9
+    cell_sz = 30. / 1000.
+    scale = 15
+
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    src = Source()
+    horn = get_default_pyramidal_horn(freq)
+    src.append(horn, abg, (0., 0., cell_sz*scale))
+    tp = [(np.deg2rad(0), np.deg2rad(0))]
+
+    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', (tp)), ideal_ref_unit)
+    solver = RASolver(arr)
+    tsk1 = Gain2D(np.deg2rad(0), 300)
+    tsk2 = Gain2D(np.deg2rad(90), 300)
+    tsk3 = Gain3D(91, 181)
+    #solver.append_task(tsk1)
+    #solver.append_task(tsk2)
+    solver.append_task(tsk3)
+    #solver.run()
+    solver.run_concurrency()
+    #tsk1.post_process()
+    #tsk2.post_process()
+    tsk3.post_process()
+
+
 if __name__ == '__main__':
-    test1()
-    test2()
+    #test1()
+    #test2()
+    test_multi()
