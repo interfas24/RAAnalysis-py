@@ -130,16 +130,16 @@ class Gain2D(FarZone):
         ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
         super().__init__([phi], ts)
 
-    def post_process(self):
+    def post_process(self, integ, plot=False):
         fields = np.reshape(self.alldat, (self.nrow, self.ncol))
-        print(fields)
-        integ = 22732.769823328235
         gs = [x.get_gain(integ) for x in fields[0]]
         gs = dB(gs)
 
-        plt.figure()
-        plt.plot(self.col, gs)
-        plt.show()
+        if plot:
+            plt.figure()
+            plt.plot(self.col, gs)
+            plt.show()
+        return [self.col, gs]
 
 
 class Gain3D(FarZone):
