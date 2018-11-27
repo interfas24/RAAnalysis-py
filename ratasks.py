@@ -1,7 +1,6 @@
 import numpy as np
-from rautils import farR, sph2car_mtx, make_v_mtx, dB
+from rautils import farR, sph2car_mtx, make_v_mtx, dB, car2sph
 import threading
-
 import matplotlib.pyplot as plt
 
 class EfieldResult:
@@ -81,6 +80,7 @@ class FarZone:
         self.ncol = len(col)
         self.alldat = np.empty(self.nrow*self.ncol, dtype=EfieldResult)
         self.lock = threading.Lock()
+        self.R = farR
 
     def __len__(self):
         return self.nrow * self.ncol
@@ -99,6 +99,9 @@ class FarZone:
         return self.alldat[item]
     """
 
+    def set_R(self, r):
+        self.R = r
+
     def set_results(self, tsk):
         with self.lock:
             b, e = tsk.get_old_idx()
@@ -107,7 +110,7 @@ class FarZone:
 
     def assign_task(self, mp=200):
         if len(self) <= mp:
-            pos = [(farR, t, p) for t in self.col for p in self.row]
+            pos = [(self.R, t, p) for t in self.col for p in self.row]
             return [Task((0, len(self)), pos)]
         else:
             tsk = []
@@ -115,7 +118,7 @@ class FarZone:
             pos = []
             for p in self.row:
                 for t in self.col:
-                    pos.append((farR, t, p))
+                    pos.append((self.R, t, p))
                     e += 1
                     if e - b == mp:
                         tsk.append(Task((b, e), pos))
@@ -130,12 +133,12 @@ class Gain2D(FarZone):
         ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
         super().__init__([phi], ts)
 
-    def post_process(self, integ, plot=False):
+    def post_process(self, integ, fig=False):
         fields = np.reshape(self.alldat, (self.nrow, self.ncol))
         gs = [x.get_gain(integ) for x in fields[0]]
         gs = dB(gs)
 
-        if plot:
+        if fig:
             plt.figure()
             plt.plot(self.col, gs)
             plt.show()
@@ -168,12 +171,106 @@ class Directivity3D(FarZone):
     pass
 
 class FresnelPlane:
-    pass
+    def __init__(self, t, axis, r0, wxy, Nxy):
+        if axis == 'X':
+            rt = np.matrix([
+                [1, 0, 0],
+                [0, np.cos(t), -np.sin(t)],
+                [0, np.sin(t), np.cos(t)]
+            ])
+        elif axis == 'Y':
+            rt = np.matrix([
+                [np.cos(t), 0, np.sin(t)],
+                [0, 1, 0],
+                [-np.sin(t), 0, np.cos(t)]
+            ])
+        elif axis == 'Z':
+            rt = np.matrix([
+                [np.cos(t), -np.sin(t), 0],
+                [np.sin(t), np.cos(t), 0],
+                [0, 0, 1]
+            ])
+        else:
+            rt = np.matrix([
+                [1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1]
+            ])
+        wx, wy = wxy
+        Nx, Ny = Nxy
+        ox = np.linspace(-wx/2, wx/2, Nx)
+        oy = np.linspace(-wy/2, wy/2, Ny)
+        self.allpos = []
+        self.alldat = np.empty(Nx*Ny, dtype=EfieldResult)
+        self.lock = threading.Lock()
+        self.size = Nx*Ny
+        self.Nx = Nx
+        self.Ny = Ny
+        self.ox = ox
+        self.oy = oy
+
+        for y in oy:
+            for x in ox:
+                oxyz = np.matrix([x, y, r0])
+                oxyz = np.transpose(oxyz)
+                xyz = rt * oxyz
+                R, T, P = car2sph(xyz.item(0), xyz.item(1), xyz.item(2))
+                self.allpos.append((R, T, P))
+
+    def __len__(self):
+        return self.size
+
+    def set_results(self, tsk):
+        with self.lock:
+            b, e = tsk.get_old_idx()
+            for i in range(b, e):
+                self.alldat.put(i, tsk.get_results()[i-b])
+
+    def assign_task(self, mp=200):
+        if len(self) <= mp:
+            #pos = [(self.R, t, p) for t in self.col for p in self.row]
+            return [Task((0, len(self)), self.allpos)]
+        else:
+            tsk = []
+            b, e = 0, 0
+            pos = []
+
+            for i in range(len(self)):
+                pos.append(self.allpos[i])
+                e += 1
+                if e - b == mp:
+                    tsk.append(Task((b, e), pos))
+                    pos = []
+                    b = e
+            tsk.append(Task((b, e), pos))
+            return tsk
+
+    def post_process(self, integ, fig=False):
+        #fields = np.reshape(self.alldat, (self.Ny, self.Nx))
+        mag, phase = [], []
+        for dat in self.alldat:
+            Ex, Ey, Ez = dat.get_car_field()
+            phase.append(np.angle(Ey))
+            mag.append(np.abs(np.sqrt(Ez**2 + Ey**2 + Ez**2)))
+
+        mag = np.reshape(mag, (self.Ny, self.Nx))
+        phase = np.reshape(phase, (self.Ny, self.Nx))
+
+        if fig:
+            plt.figure()
+            plt.pcolor(self.ox, self.oy, mag)
+            plt.show()
+
+            plt.figure()
+            plt.pcolor(self.ox, self.oy, phase)
+            plt.show()
+        return mag, phase
 
 
 if __name__ == '__main__':
-    g2d = Gain2D(np.deg2rad(0), 100.)
-    tsks = g2d.assign_task()
+    #g2d = Gain2D(np.deg2rad(0), 100.)
+    f2d = FresnelPlane(0.0, '0', 1.0, (0.5, 0.5), (50, 50))
+    tsks = f2d.assign_task()
 
     for (i, tsk) in list(enumerate(tsks)):
         print('in task {}'.format(i))
