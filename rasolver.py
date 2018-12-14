@@ -150,19 +150,22 @@ def test2():
 def test_multi():
     freq = 5e9
     cell_sz = 30. / 1000.
-    scale = 20
+    scale = 30
 
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     src = Source()
     horn = get_default_pyramidal_horn(freq)
     src.append(horn, abg, (0., 0., cell_sz*scale))
-    tp = [(np.deg2rad(0), np.deg2rad(0))]
+    tp = [(np.deg2rad(20), np.deg2rad(0)), (np.deg2rad(20), np.deg2rad(90)),
+          (np.deg2rad(20), np.deg2rad(180)), (np.deg2rad(20), np.deg2rad(270))]
+    tpm = [(np.deg2rad(0), np.deg2rad(0), 1)]
 
     arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', (tp)), ideal_ref_unit)
+    #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
     solver = RASolver(arr)
     tsk1 = Gain2D(np.deg2rad(0), 300)
     tsk2 = Gain2D(np.deg2rad(90), 300)
-    tsk3 = Gain3D(100, 100)
+    tsk3 = Gain3D(150, 150)
     #solver.append_task(tsk1)
     #solver.append_task(tsk2)
     solver.append_task(tsk3)

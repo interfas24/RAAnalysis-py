@@ -165,14 +165,11 @@ class Gain3D(FarZone):
                 gs[id,:] = np.array(g)
 
             T, P = np.meshgrid(self.ts, self.ps)
-            #X = np.asmatrix(gs) * np.sin(np.asmatrix(T)) * np.cos(np.asmatrix(P))
-            #Y = np.asmatrix(gs) * np.sin(np.asmatrix(T)) * np.sin(np.asmatrix(P))
-            #Z = np.asmatrix(gs) * np.cos(np.asmatrix(T))
 
             for i in range(len(self.ps)):
                 for j in range(len(self.ts)):
-                    if gs[i,j] < -30:
-                        gs[i, j] = -30
+                    if gs[i,j] < -10:
+                        gs[i, j] = -10
 
             gs = gs - np.min(gs)
 
@@ -180,18 +177,12 @@ class Gain3D(FarZone):
             Y = gs * np.sin(T) * np.sin(P)
             Z = gs * np.cos(T)
 
-            """
-            x = np.linspace(-10, 10, num=91)
-            y = np.linspace(-10, 10, num=91)
-            X, Y = np.meshgrid(x, y)
-            Z = gs * np.cos(T)
-            """
-
             fg = plt.figure()
             ax = fg.gca(projection='3d')
 
             surf = ax.plot_surface(X, Y, Z, cmap=cm.jet,
-                                   linewidth=0, antialiased=False)
+                                   rstride=1, cstride=1,
+                                   linewidth=0, antialiased=False, shade=True)
 
             fg.colorbar(surf, shrink=0.5, aspect=5)
             plt.show()
