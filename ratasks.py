@@ -3,6 +3,10 @@ from rautils import farR, sph2car_mtx, make_v_mtx, dB, car2sph
 import threading
 import matplotlib.pyplot as plt
 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+
 class EfieldResult:
     def __init__(self, Etheta, Ephi, pos):
         (r, t, p) = pos
@@ -147,21 +151,50 @@ class Gain2D(FarZone):
 
 class Gain3D(FarZone):
     def __init__(self, nphi, ntheta):
-        ps = np.linspace(0, np.pi*2, nphi)
-        ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
-        super().__init__(ps, ts)
+        self.ps = np.linspace(0, np.pi*2, nphi)
+        self.ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
+        super().__init__(self.ps, self.ts)
 
-    def post_process(self):
+    def post_process(self, integ, fig=False):
         fields = np.reshape(self.alldat, (self.nrow, self.ncol))
-        #print(fields)
-        id = int(self.nrow / 2)
-        integ = 22732.769823328235
-        gs = [x.get_gain(integ) for x in fields[10]]
-        gs = dB(gs)
+        gs = np.ndarray(shape=fields.shape)
 
-        plt.figure()
-        plt.plot(self.col, gs)
-        plt.show()
+        if fig:
+            for (id, field) in list(enumerate(fields)):
+                g = dB([x.get_gain(integ) for x in field])
+                gs[id,:] = np.array(g)
+
+            T, P = np.meshgrid(self.ts, self.ps)
+            #X = np.asmatrix(gs) * np.sin(np.asmatrix(T)) * np.cos(np.asmatrix(P))
+            #Y = np.asmatrix(gs) * np.sin(np.asmatrix(T)) * np.sin(np.asmatrix(P))
+            #Z = np.asmatrix(gs) * np.cos(np.asmatrix(T))
+
+            for i in range(len(self.ps)):
+                for j in range(len(self.ts)):
+                    if gs[i,j] < -30:
+                        gs[i, j] = -30
+
+            gs = gs - np.min(gs)
+
+            X = gs * np.sin(T) * np.cos(P)
+            Y = gs * np.sin(T) * np.sin(P)
+            Z = gs * np.cos(T)
+
+            """
+            x = np.linspace(-10, 10, num=91)
+            y = np.linspace(-10, 10, num=91)
+            X, Y = np.meshgrid(x, y)
+            Z = gs * np.cos(T)
+            """
+
+            fg = plt.figure()
+            ax = fg.gca(projection='3d')
+
+            surf = ax.plot_surface(X, Y, Z, cmap=cm.jet,
+                                   linewidth=0, antialiased=False)
+
+            fg.colorbar(surf, shrink=0.5, aspect=5)
+            plt.show()
 
 
 class Directivity2D(FarZone):

@@ -150,7 +150,7 @@ def test2():
 def test_multi():
     freq = 5e9
     cell_sz = 30. / 1000.
-    scale = 15
+    scale = 20
 
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     src = Source()
@@ -162,15 +162,15 @@ def test_multi():
     solver = RASolver(arr)
     tsk1 = Gain2D(np.deg2rad(0), 300)
     tsk2 = Gain2D(np.deg2rad(90), 300)
-    tsk3 = Gain3D(91, 181)
+    tsk3 = Gain3D(100, 100)
     #solver.append_task(tsk1)
     #solver.append_task(tsk2)
     solver.append_task(tsk3)
-    #solver.run()
-    solver.run_concurrency()
+    solver.run()
+    #solver.run_concurrency()
     #tsk1.post_process()
     #tsk2.post_process()
-    tsk3.post_process()
+    tsk3.post_process(22732.769823328235, True)
 
 
 if __name__ == '__main__':
