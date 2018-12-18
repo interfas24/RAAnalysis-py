@@ -109,6 +109,7 @@ class FarZone:
     def set_results(self, tsk):
         with self.lock:
             b, e = tsk.get_old_idx()
+            print(b, e)
             for i in range(b, e):
                 self.alldat.put(i, tsk.get_results()[i-b])
 
@@ -145,6 +146,7 @@ class Gain2D(FarZone):
         if fig:
             plt.figure()
             plt.plot(self.col, gs)
+            plt.ylim(-30, 40)
             plt.show()
         return [self.col, gs]
 

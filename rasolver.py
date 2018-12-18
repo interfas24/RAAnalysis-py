@@ -9,6 +9,7 @@ import time
 import concurrent.futures
 import threading
 
+
 """
 1. array info (cell size scale | horns)
 2. get phase
@@ -59,17 +60,6 @@ class RASolver:
     def append_task(self, tsk):
         self.tasks.append(tsk)
 
-    # iterate on tasks, each task use multi-threading
-    def run(self):
-        for task in self.tasks:
-            field_task = task.assign_task()
-            start_time = time.clock()
-            for tsk in field_task:
-                for (r, t, p) in tsk:
-                    tsk.set_current_result(self.__calc_one_point(r, t, p))
-                task.set_results(tsk)
-            print(time.clock()-start_time, "sec")
-
     # calc a task in a thread
     def __calc_one_task__(self, tsk):
         #with self.lock:
@@ -77,80 +67,59 @@ class RASolver:
                 tsk.set_current_result(self.__calc_one_point(r, t, p))
             return tsk
 
+    # iterate on tasks, each task use multi-threading
+    def run(self):
+        for task in self.tasks:
+            field_task = task.assign_task()
+            start_time = time.clock()
+            for tsk in field_task:
+                ret = self.__calc_one_task__(tsk)
+                task.set_results(ret)
+            print(time.clock()-start_time, "sec")
+
     # Bugs here
     def run_concurrency(self):
         for task in self.tasks:
             field_task = task.assign_task()
             start_time = time.clock()
-            tsk_list = []
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as e:
-                for tsk in field_task:
-                    print(type(tsk))
-                    e.submit(self.__calc_one_task__, tsk)
-                    tsk_list.append(tsk)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as e:
+                futs = {e.submit(self.__calc_one_task__, tsk): tsk for tsk in field_task}
+
+                idx = []
+                fields = []
+                for fut in concurrent.futures.as_completed(futs):
+                    #task.set_results(fut.result())
+                    task.set_results(futs[fut])
+                    res = fut.result()
+                    b, e = res.get_old_idx()
+                    #print(range(b, e))
+                    idx.extend(range(b, e))
+                    #ef = res.get_results()
+                    direct = [f.get_gain(22732.769823328235) for f in res.get_results()]
+                    direct = dB(direct)
+                    fields.extend(direct)
+                    #print(direct)
+                    #idx.append(range(b, e))
+                    #fields.append()
+                    #print(fut.result(), fut.done())
+
+                print(idx)
+                print(fields)
+                plt.figure()
+                plt.plot(idx, fields)
+                plt.show()
+
             print(time.clock()-start_time, "sec")
 
-            for t in tsk_list:
-                task.set_results(t)
-
-    def test(self):
-        N = 300
-        ts = np.linspace(np.deg2rad(-89), np.deg2rad(89), N)
-        ps = np.deg2rad(0)
-
-        res = []
-        for t in ts:
-            res.append(self.__calc_one_point(farR, t, ps))
-        et = []
-        integ = 22732.769823328235
-        for x in res:
-            et.append(x.get_gain(integ))
-        et = dB(et)
-        plt.figure()
-        plt.plot(np.rad2deg(ts), et)
-        plt.show()
-
-
-def test1():
-    freq = 5e9
-    cell_sz = 30. / 1000.
-    scale = 20
-
-    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
-    src = Source()
-    horn = get_default_pyramidal_horn(freq)
-    src.append(horn, abg, (0., 0., 0.5))
-    tp = [(np.deg2rad(0), np.deg2rad(0))]
-    tpm = [(np.deg2rad(20), np.deg2rad(0), 1)]
-    foci = [(0, 0, 0.8, 1.0)]
-
-    #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
-    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tp), ideal_ref_unit)
-    solver = RASolver(arr)
-    solver.test()
-
-def test2():
-    freq = 5e9
-    cell_sz = 30. / 1000.
-    scale = 20
-
-    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
-    src = Source()
-    horn = get_default_pyramidal_horn(freq)
-    src.append(horn, abg, (0., 0., 0.5))
-    tp = [(np.deg2rad(0), np.deg2rad(0))]
-    tpm = [(np.deg2rad(20), np.deg2rad(0), 1)]
-    foci = [(0, 0, 0.8, 1.0)]
-
-    #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
-    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tp), lambda p:ideal_ref_unit(p, bits=3))
-    solver = RASolver(arr)
-    solver.test()
 
 def test_multi():
     freq = 5e9
     cell_sz = 30. / 1000.
     scale = 30
+
+    # pre calculated horn power integration at 5GHz
+    horn_integ = 22732.769823328235
 
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     src = Source()
@@ -158,25 +127,24 @@ def test_multi():
     src.append(horn, abg, (0., 0., cell_sz*scale))
     tp = [(np.deg2rad(20), np.deg2rad(0)), (np.deg2rad(20), np.deg2rad(90)),
           (np.deg2rad(20), np.deg2rad(180)), (np.deg2rad(20), np.deg2rad(270))]
+    #tp = [(np.deg2rad(0), np.deg2rad(0))]
     tpm = [(np.deg2rad(0), np.deg2rad(0), 1)]
 
     arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', (tp)), ideal_ref_unit)
     #arr = RAInfo(src, cell_sz, (scale, scale), ('oam', (tpm, np.deg2rad(0))), ideal_ref_unit)
     solver = RASolver(arr)
-    tsk1 = Gain2D(np.deg2rad(0), 300)
-    tsk2 = Gain2D(np.deg2rad(90), 300)
-    tsk3 = Gain3D(150, 150)
-    #solver.append_task(tsk1)
+    tsk1 = Gain2D(np.deg2rad(0), 999)
+    tsk2 = Gain2D(np.deg2rad(90), 600)
+    tsk3 = Gain3D(100, 100)
+    solver.append_task(tsk1)
     #solver.append_task(tsk2)
-    solver.append_task(tsk3)
-    solver.run()
-    #solver.run_concurrency()
-    #tsk1.post_process()
-    #tsk2.post_process()
-    tsk3.post_process(22732.769823328235, True)
+    #solver.append_task(tsk3)
+    #solver.run()
+    solver.run_concurrency()
+    tsk1.post_process(horn_integ, True)
+    #tsk2.post_process(horn_integ, True)
+    #tsk3.post_process(horn_integ, True)
 
 
 if __name__ == '__main__':
-    #test1()
-    #test2()
     test_multi()
