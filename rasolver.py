@@ -83,32 +83,14 @@ class RASolver:
             field_task = task.assign_task()
             start_time = time.clock()
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as e:
-                futs = {e.submit(self.__calc_one_task__, tsk): tsk for tsk in field_task}
+            #t_num = int(len(field_task))
+            t_num = 4
+            with concurrent.futures.ThreadPoolExecutor(max_workers=t_num) as e:
+                futs = [e.submit(self.__calc_one_task__, tsk) for tsk in field_task]
 
-                idx = []
-                fields = []
                 for fut in concurrent.futures.as_completed(futs):
-                    #task.set_results(fut.result())
-                    task.set_results(futs[fut])
-                    res = fut.result()
-                    b, e = res.get_old_idx()
-                    #print(range(b, e))
-                    idx.extend(range(b, e))
-                    #ef = res.get_results()
-                    direct = [f.get_gain(22732.769823328235) for f in res.get_results()]
-                    direct = dB(direct)
-                    fields.extend(direct)
-                    #print(direct)
-                    #idx.append(range(b, e))
-                    #fields.append()
-                    #print(fut.result(), fut.done())
-
-                print(idx)
-                print(fields)
-                plt.figure()
-                plt.plot(idx, fields)
-                plt.show()
+                    #task.set_results(futs[fut])
+                    task.set_results(fut.result())
 
             print(time.clock()-start_time, "sec")
 
