@@ -178,8 +178,8 @@ def get_default_pyramidal_horn(freq, E0=10.0):
 def test_horn():
     f = 5.0e9
     cell_sz = 15. / 1000.
-    scale = 50
-    z = 0.6
+    scale = 20
+    z = cell_sz*scale
 
     phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f)
     xl, yl = create_array_pos(cell_sz, scale, scale, ex=True)
@@ -187,19 +187,19 @@ def test_horn():
     pE = np.ndarray((len(yl), len(xl)))
     for (yi, y) in list(enumerate(yl)):
         for (xi, x) in list(enumerate(xl)):
-            Exyz, _, _ = phorn.efield_at_xyz(x, y, z)
+            Exyz, _, _ = phorn.efield_at_xyz(x-cell_sz*2, y-cell_sz*2, z)
             mag = np.sqrt(Exyz.item(0)**2 + Exyz.item(1)**2 + Exyz.item(2)**2)
             pha = np.angle(Exyz.item(1))
             magE[yi, xi] = np.abs(mag)
             pE[yi, xi] = pha
 
     plt.figure()
-    plt.pcolor(xl, yl, magE)
+    plt.pcolor(xl, yl, magE, cmap='jet')
 
     plt.figure()
-    plt.pcolor(xl, yl, pE)
-    plt.show()
+    plt.pcolor(xl, yl, pE, cmap='jet')
 
+    plt.show()
 
 if __name__ == '__main__':
     test_horn()

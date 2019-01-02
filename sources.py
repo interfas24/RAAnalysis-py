@@ -39,6 +39,7 @@ class Source:
         self.src = []
         self.abg = []
         self.pos = []
+        self.direction = []
         self.idx = 0
         self.type = ''
 
@@ -52,7 +53,7 @@ class Source:
     def __next__(self):
         if self.idx == len(self):
             raise StopIteration
-        ret = self.src[self.idx], self.abg[self.idx], self.pos[self.idx]
+        ret = self.src[self.idx], self.abg[self.idx], self.pos[self.idx], self.direction[self.idx]
         self.idx += 1
         return ret
 
@@ -69,13 +70,14 @@ class Source:
             raise ValueError
         return self.src[0].get_k0()
 
-    def append(self, src, abg, pos):
+    def append(self, src, abg, pos, dir='origin'):
         if self.type and self.type != type(src):
             print('source should be in same type')
             raise TypeError
         self.src.append(src)
         self.abg.append(abg)
         self.pos.append(pos)
+        self.direction.append(dir)
         self.type = type(src)
 
 def test_plane_wave():

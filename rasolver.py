@@ -77,7 +77,7 @@ class RASolver:
                 task.set_results(ret)
             print(time.clock()-start_time, "sec")
 
-    # Bugs here
+    # FixMe bug with concurrency
     def run_concurrency(self):
         for task in self.tasks:
             field_task = task.assign_task()

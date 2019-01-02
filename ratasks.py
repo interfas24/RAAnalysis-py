@@ -89,27 +89,12 @@ class FarZone:
     def __len__(self):
         return self.nrow * self.ncol
 
-    """
-    def __setitem__(self, key, value):
-        with self.lock:
-            if key > len(self):
-                print('index exceeds')
-                raise ValueError
-            self.alldat[key] = value
-    """
-
-    """
-    def __getitem__(self, item):
-        return self.alldat[item]
-    """
-
     def set_R(self, r):
         self.R = r
 
     def set_results(self, tsk):
         with self.lock:
             b, e = tsk.get_old_idx()
-            print(b, e)
             for i in range(b, e):
                 self.alldat.put(i, tsk.get_results()[i-b])
 

@@ -43,7 +43,7 @@ class RAInfo:
             cpos = [(x, y) for y in yl for x in xl]
 
         key, val = kv
-        fpos = [p for _, _, p in src] if src.is_horn() else None
+        fpos = [p for _, _, p, _ in src] if src.is_horn() else None
         bf = BeamForming(src.frequency(), xl, yl, fpos)
         if key == 'file':
             ret = []
@@ -75,14 +75,21 @@ class RAInfo:
         #TODO: circle board
 
         sp = func(allp)
-        # iter on sources
 
+        # iter on sources
         for (i, (x, y)) in list(enumerate(cpos)):
             erx, ery = 0j, 0j
-            for s, abg, pos in src:
+            for s, abg, pos, dir in src:
                 dis = distance(pos, (0., 0., 0.))
                 fpt = R2F(*abg) * make_v_mtx(x, y, 0.0)
-                fpt[2][0] += dis
+
+                if dir == 'origin':
+                    fpt[2][0] += dis
+                elif dir == 'parallel':
+                    fpt[0][0] += pos[0]
+                    fpt[1][0] += pos[1]
+                    fpt[2][0] += pos[2]
+
                 Exyz, _, _ = s.efield_at_xyz(fpt.item(0), fpt.item(1), fpt.item(2))
                 in_efield = F2R(*abg) * Exyz
                 erx += in_efield.item(0)
