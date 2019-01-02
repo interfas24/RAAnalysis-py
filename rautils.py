@@ -3,6 +3,7 @@ import numpy as np
 
 sol = 299792458   # speed of light    unit:m/s
 farR = 1e5
+waveimpd = 119.9169832 * np.pi
 
 def distance(pt1, pt2):
     return np.sqrt((pt1[0]-pt2[0])**2 + (pt1[1]-pt2[1])**2 + (pt1[2]-pt2[2])**2)
@@ -99,6 +100,16 @@ def ideal_ref_unit(pha, amp=1.0, bits=None):
     return ret
 
 
+def far_field_distance(freq, maxlen):
+    """
+    Calculate far-field distance
+    :param freq: unit : GHz
+    :param maxlen: max length of the aperture antenna, unit : m
+    :return: far-field distance, unit : m
+    """
+    return 2 * maxlen * maxlen / (sol / freq)
+
+
 if __name__ == '__main__':
     print(distance((1,2,3), (4,5,6)), np.sqrt(27))
     cell_sz = 10.
@@ -116,3 +127,4 @@ if __name__ == '__main__':
     xyz_mtx = make_v_mtx(*xyz)
     print(car2sph_mtx(t, p)*xyz_mtx)
     print(sph2car_mtx(t, p)*car2sph_mtx(t, p)*xyz_mtx)
+    print(waveimpd)

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from rautils import dB, distance, sol, create_array_pos, car2sph
+from rautils import dB, distance, sol, create_array_pos, car2sph, waveimpd
 from scipy import integrate
 
 
@@ -29,10 +29,10 @@ class PyramidalHorn:
         return self.k0
 
     def integ_func(self, t, p):
-        R = 100.
+        R = 100.    # any R would be ok
         _, et, ep = self.efield_at_rtp(R, t, p)
         etp = np.sqrt(et**2 + ep**2)
-        return np.abs(etp)**2 *R*R*np.sin(t)
+        return np.abs(etp)**2 *R*R*np.sin(t) / (2*waveimpd)
 
     def efield_at_xyz(self, x, y, z):
         r, theta, phi = car2sph(x, y, z)
@@ -166,14 +166,16 @@ class PyramidalHorn:
 
 
 def get_horn_input_power(horn):
+    if not isinstance(horn, PyramidalHorn):
+        raise ValueError
     ret = integrate.nquad(horn.integ_func, [[0, np.pi/2.], [0, np.pi*2]])
     return ret[0]
 
-def get_default_pyramidal_horn(freq):
-    return PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, freq)
+def get_default_pyramidal_horn(freq, E0=10.0):
+    return PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, E0, freq)
 
 
-if __name__ == '__main__':
+def test_horn():
     f = 5.0e9
     cell_sz = 15. / 1000.
     scale = 50
@@ -188,9 +190,7 @@ if __name__ == '__main__':
             Exyz, _, _ = phorn.efield_at_xyz(x, y, z)
             mag = np.sqrt(Exyz.item(0)**2 + Exyz.item(1)**2 + Exyz.item(2)**2)
             pha = np.angle(Exyz.item(1))
-            #print(mag, pha)
-            #magE[yi, xi] = np.abs(mag)
-            magE[yi, xi] = mag.real
+            magE[yi, xi] = np.abs(mag)
             pE[yi, xi] = pha
 
     plt.figure()
@@ -200,3 +200,6 @@ if __name__ == '__main__':
     plt.pcolor(xl, yl, pE)
     plt.show()
 
+
+if __name__ == '__main__':
+    test_horn()

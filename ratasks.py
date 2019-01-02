@@ -1,5 +1,5 @@
 import numpy as np
-from rautils import farR, sph2car_mtx, make_v_mtx, dB, car2sph
+from rautils import farR, sph2car_mtx, make_v_mtx, dB, car2sph, waveimpd
 import threading
 import matplotlib.pyplot as plt
 
@@ -33,7 +33,7 @@ class EfieldResult:
         return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*377.)
 
     def get_gain(self, ipower):
-        return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / ipower
+        return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / (ipower * 2 * waveimpd)
 
 class TaskState:
     Pending = 1
@@ -277,7 +277,8 @@ class FresnelPlane:
         for dat in self.alldat:
             Ex, Ey, Ez = dat.get_car_field()
             phase.append(np.angle(Ey))
-            mag.append(np.abs(np.sqrt(Ez**2 + Ey**2 + Ez**2)))
+            #mag.append(np.abs(np.sqrt(Ex**2 + Ey**2 + Ez**2)))
+            mag.append(np.abs(np.sqrt(Ex*np.conj(Ex) + Ey*np.conj(Ey) + Ez*np.conj(Ez))))
 
         mag = np.reshape(mag, (self.Ny, self.Nx))
         phase = np.reshape(phase, (self.Ny, self.Nx))
@@ -285,10 +286,12 @@ class FresnelPlane:
         if fig:
             plt.figure()
             plt.pcolor(self.ox, self.oy, mag)
+            plt.colorbar()
             plt.show()
 
             plt.figure()
             plt.pcolor(self.ox, self.oy, phase)
+            plt.colorbar()
             plt.show()
         return mag, phase
 
