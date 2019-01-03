@@ -270,12 +270,12 @@ class FresnelPlane:
 
         if fig:
             plt.figure()
-            plt.pcolor(self.ox, self.oy, mag)
+            plt.pcolor(self.ox, self.oy, mag, cmap='jet')
             plt.colorbar()
             plt.show()
 
             plt.figure()
-            plt.pcolor(self.ox, self.oy, phase)
+            plt.pcolor(self.ox, self.oy, phase, cmap='jet')
             plt.colorbar()
             plt.show()
         return mag, phase
