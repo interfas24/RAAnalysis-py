@@ -5,7 +5,7 @@ from scipy import integrate
 
 
 class PyramidalHorn:
-    def __init__(self, r1, r2, a, b, a1, b1, E0, freq):
+    def __init__(self, r1, r2, a, b, a1, b1, E0, freq, initp=0.0):
         k0 = 2 * np.pi / (sol / freq)
 
         self.r1 = r1
@@ -18,6 +18,7 @@ class PyramidalHorn:
         self.k0 = k0
         self.rz = 1
         self.freq = freq
+        self.initp = initp
 
     def have_input_power(self):
         return True
@@ -58,8 +59,8 @@ class PyramidalHorn:
         I2 = np.sqrt(np.pi*self.r1/k) * np.exp(1j*ky**2*self.r1/(2*k)) * (self.Fresnel(t2) - self.Fresnel(t1))
 
         k = self.k0
-        Etheta = 1j*k*self.E0*np.exp(-1j*k*r)/(4*np.pi*r) * (np.sin(phi) * (1+np.cos(theta)) * I1 * I2)
-        Ephi = 1j*k*self.E0*np.exp(-1j*k*r)/(4*np.pi*r) * (np.cos(phi) * (1+np.cos(theta)) * I1 * I2)
+        Etheta = 1j*k*self.E0*np.exp(-1j*(k*r + self.initp))/(4*np.pi*r) * (np.sin(phi) * (1+np.cos(theta)) * I1 * I2)
+        Ephi = 1j*k*self.E0*np.exp(-1j*(k*r + self.initp))/(4*np.pi*r) * (np.cos(phi) * (1+np.cos(theta)) * I1 * I2)
 
         tmtx = np.matrix(
             [
@@ -171,23 +172,23 @@ def get_horn_input_power(horn):
     ret = integrate.nquad(horn.integ_func, [[0, np.pi/2.], [0, np.pi*2]])
     return ret[0]
 
-def get_default_pyramidal_horn(freq, E0=10.0):
-    return PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, E0, freq)
+def get_default_pyramidal_horn(freq, E0=10.0, initp=0.0):
+    return PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, E0, freq, initp)
 
 
 def test_horn():
     f = 5.0e9
     cell_sz = 15. / 1000.
-    scale = 20
-    z = cell_sz*scale
+    scale = 50
+    z = cell_sz*scale*1
 
-    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f)
+    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f, initp=np.deg2rad(180))
     xl, yl = create_array_pos(cell_sz, scale, scale, ex=True)
     magE = np.ndarray((len(yl), len(xl)))
     pE = np.ndarray((len(yl), len(xl)))
     for (yi, y) in list(enumerate(yl)):
         for (xi, x) in list(enumerate(xl)):
-            Exyz, _, _ = phorn.efield_at_xyz(x-cell_sz*2, y-cell_sz*2, z)
+            Exyz, _, _ = phorn.efield_at_xyz(x, y, z)
             mag = np.sqrt(Exyz.item(0)**2 + Exyz.item(1)**2 + Exyz.item(2)**2)
             pha = np.angle(Exyz.item(1))
             magE[yi, xi] = np.abs(mag)

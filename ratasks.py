@@ -30,7 +30,7 @@ class EfieldResult:
 
     def get_directivity(self):
         (r, t, p) = self.Pos
-        return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*377.)
+        return np.abs(self.Etotal)*np.abs(self.Etotal)*r*r/(2*waveimpd)
 
     def get_gain(self, ipower):
         return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / (ipower * 2 * waveimpd)

@@ -86,8 +86,8 @@ class RAInfo:
                 if dir == 'origin':
                     fpt[2][0] += dis
                 elif dir == 'parallel':
-                    fpt[0][0] += pos[0]
-                    fpt[1][0] += pos[1]
+                    fpt[0][0] -= pos[0]
+                    fpt[1][0] -= pos[1]
                     fpt[2][0] += pos[2]
 
                 Exyz, _, _ = s.efield_at_xyz(fpt.item(0), fpt.item(1), fpt.item(2))
