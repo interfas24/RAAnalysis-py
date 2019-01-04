@@ -76,7 +76,7 @@ class Task:
 
 
 class FarZone:
-    def __init__(self, row, col):
+    def __init__(self, row, col, freq=10e9):
         self.state = TaskState.Pending
         self.row = row
         self.col = col
@@ -85,6 +85,7 @@ class FarZone:
         self.alldat = np.empty(self.nrow*self.ncol, dtype=EfieldResult)
         self.lock = threading.Lock()
         self.R = farR
+        self.freq = freq
 
     def __len__(self):
         return self.nrow * self.ncol
@@ -119,11 +120,11 @@ class FarZone:
 
 
 class Gain2D(FarZone):
-    def __init__(self, phi, ntheta):
+    def __init__(self, phi, ntheta, freq=10e9):
         ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
-        super().__init__([phi], ts)
+        super().__init__([phi], ts, freq)
 
-    def post_process(self, integ, fig=False):
+    def post_process(self, integ, fig=False, exfn=None):
         fields = np.reshape(self.alldat, (self.nrow, self.ncol))
         gs = [x.get_gain(integ) for x in fields[0]]
         gs = dB(gs)
@@ -133,26 +134,42 @@ class Gain2D(FarZone):
             plt.plot(self.col, gs)
             plt.ylim(-30, 40)
             plt.show()
-        return [self.col, gs]
+
+        if exfn != None:
+            afile = open(exfn, 'w')
+            afile.write('Theta[deg],dB(GainTotal)[] - Freq=\'{}GHz\' Phi=\'{}deg\'\n'
+                        .format(self.freq/1e9, np.rad2deg(self.row[0])))
+            ts = np.rad2deg(self.col)
+            for i in range(len(ts)):
+                afile.write('{},{}\n'.format(ts[i], gs[i]))
+            afile.close()
 
 
 class Gain3D(FarZone):
-    def __init__(self, nphi, ntheta):
+    def __init__(self, nphi, ntheta, freq=1e9):
         self.ps = np.linspace(0, np.pi*2, nphi)
         self.ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
-        super().__init__(self.ps, self.ts)
+        super().__init__(self.ps, self.ts, freq)
 
-    def post_process(self, integ, fig=False):
+    def post_process(self, integ, fig=False, exfn=None):
         fields = np.reshape(self.alldat, (self.nrow, self.ncol))
         gs = np.ndarray(shape=fields.shape)
+        for (id, field) in list(enumerate(fields)):
+            g = dB([x.get_gain(integ) for x in field])
+            gs[id,:] = np.array(g)
+
+        if exfn != None:
+            afile = open(exfn, 'w')
+            afile.write('Phi[deg],Theta[deg],dB(GainTotal)\n')
+            ps = np.rad2deg(self.row)
+            ts = np.rad2deg(self.col)
+            for i in range(self.ncol):
+                for j in range(self.nrow):  #j phi
+                    afile.write('{},{},{}\n'.format(ps[j], ts[i], gs[j, i]))
+            afile.close()
 
         if fig:
-            for (id, field) in list(enumerate(fields)):
-                g = dB([x.get_gain(integ) for x in field])
-                gs[id,:] = np.array(g)
-
             T, P = np.meshgrid(self.ts, self.ps)
-
             for i in range(len(self.ps)):
                 for j in range(len(self.ts)):
                     if gs[i,j] < -10:
@@ -219,6 +236,7 @@ class FresnelPlane:
         self.Ny = Ny
         self.ox = ox
         self.oy = oy
+        self.r0 = r0
 
         for y in oy:
             for x in ox:
@@ -256,7 +274,7 @@ class FresnelPlane:
             tsk.append(Task((b, e), pos))
             return tsk
 
-    def post_process(self, integ, fig=False):
+    def post_process(self, integ, fig=False, exfn=None):
         #fields = np.reshape(self.alldat, (self.Ny, self.Nx))
         mag, phase = [], []
         for dat in self.alldat:
@@ -265,8 +283,8 @@ class FresnelPlane:
             #mag.append(np.abs(np.sqrt(Ex**2 + Ey**2 + Ez**2)))
             mag.append(np.abs(np.sqrt(Ex*np.conj(Ex) + Ey*np.conj(Ey) + Ez*np.conj(Ez))))
 
-        mag = np.reshape(mag, (self.Ny, self.Nx))
-        phase = np.reshape(phase, (self.Ny, self.Nx))
+        mag = np.reshape(mag, (self.Nx, self.Ny))
+        phase = np.reshape(phase, (self.Nx, self.Ny))
 
         if fig:
             plt.figure()
@@ -278,7 +296,19 @@ class FresnelPlane:
             plt.pcolor(self.ox, self.oy, phase, cmap='jet')
             plt.colorbar()
             plt.show()
-        return mag, phase
+
+        if exfn != None:
+            afile = open(exfn, 'w')
+            afile.write('Grid Output Min: [{}m {}m {}m] Max: [{}m {}m {}m] Grid Size: [{}m {}m 0m] Points: [{} {}]\n'
+                        'X, Y, Z, Scalar data "ComplexMag_E"\n'.format(
+                        self.ox[0], self.oy[0], self.r0,
+                        self.ox[-1], self.oy[-1], self.r0,
+                        self.ox[1]-self.ox[0], self.oy[1]-self.oy[0],
+                        self.Nx, self.Ny))
+            for i in range(len(mag)):
+                for j in range(len(mag[0])):
+                    afile.write('{} {} {} {}\n'.format(self.ox[i], self.oy[j], self.r0, mag[i,j]))
+            afile.close()
 
 
 if __name__ == '__main__':

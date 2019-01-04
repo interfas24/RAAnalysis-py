@@ -115,7 +115,7 @@ def linear_feed_pattern():
     plt.plot(np.rad2deg(ts), ds)
     plt.show()
 
-def calc_focal_2bit():
+def focal_2bit_calculation():
     freq = 5.8e9
     cell_sz = 30 / 1000.
     scale = 10
@@ -124,29 +124,62 @@ def calc_focal_2bit():
     abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
     showFig = True
 
-    integ = 40.59829
-    horn = get_default_pyramidal_horn(freq)
-    #print(get_horn_input_power(horn))
+    integ = 1.039    # 1.6, 5.8e9
+    horn = get_default_pyramidal_horn(freq, E0=1.6)
     pos = (0.0, 0.0, hz)
     src = Source()
     src.append(horn, abg, pos)
-    foki = [(-0.3, 0.3, 1.5, 1.0), (0.3, -0.3, 1.5, 1.0)]
-    bs = 2
-    arr = RAInfo(src, cell_sz, (scale, scale), ('foci', foki), lambda p:ideal_ref_unit(p, bits=bs))
 
-    solver = RASolver(arr)
-    tsk1 = FresnelPlane(0, 'xx', 1.5, (1.2, 1.2), (200, 200))
-    p = np.deg2rad(125)
-    tsk2 = Gain2D(p, 300)
-    solver.append_task(tsk1)
-    #solver.append_task(tsk2)
-    solver.run()
-    tsk1.post_process(integ, showFig)
-    #tsk2.post_process(integ, showFig)
+    focuses = (
+        [(1.0, 1.0, 1.0, 1.0)],
+        [(-0.3, 0.3, 1.5, 1.0), (0.3, -0.3, 1.5, 1.0)],
+        [(0.3, 0.3, 2.0, 1.0)]
+    )
+    hs = (
+        1.0,
+        1.5,
+        2.0
+    )
+    planes = (
+        (3.0, 3.0),
+        (1.2, 1.2),
+        (1.2, 1.2)
+    )
+    points = (
+        (301, 301),
+        (121, 121),
+        (121, 121)
+    )
+    ps = (
+        np.deg2rad(45),
+        np.deg2rad(135),
+        np.deg2rad(45)
+    )
+
+    Nt, Np = 181, 181
+
+    for idx in range(3):
+        bs = 2
+        arr = RAInfo(src, cell_sz, (scale, scale), ('foci', focuses[idx]), lambda p:ideal_ref_unit(p, bits=bs))
+
+        solver = RASolver(arr)
+        tsk1 = FresnelPlane(0, 'xx', hs[idx], planes[idx], points[idx])
+        tsk2 = Gain2D(ps[idx], Nt, freq)
+        tsk3 = Gain3D(Np, Nt)
+
+        solver.append_task(tsk1)
+        solver.append_task(tsk2)
+        solver.append_task(tsk3)
+
+        solver.run()
+
+        tsk1.post_process(integ, showFig, exfn='experiment/2bit/case{}_plane_theo.fld'.format(idx+1))
+        tsk2.post_process(integ, showFig, exfn='experiment/2bit/case{}_2d_theo.csv'.format(idx+1))
+        tsk3.post_process(integ, showFig, exfn='experiment/2bit/case{}_3d_theo.csv'.format(idx+1))
 
 
 if __name__ == '__main__':
     #test_offset_feed()
     #line_feed_array()
-    linear_feed_pattern()
-    #calc_focal_2bit()
+    #linear_feed_pattern()
+    focal_2bit_calculation()
