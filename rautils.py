@@ -88,17 +88,26 @@ def R2F(alpha, beta, gamma):
 def F2R(alpha, beta, gamma):
     return R2F(alpha, beta, gamma).transpose()
 
-def ideal_ref_unit(pha, amp=1.0, bits=None):
+def ideal_ref_unit(pha, amp=1.0, bits=None, pol='Y'):
     ret = []
     for i in range(len(pha)):
         sp = pha[i]
         if bits != None:
             step = np.pi*2/(2**bits)
             sp = int(pha[i]/step) * step
-        ret.append((amp*np.exp(1j*sp), 0j, 0j, 1+0j))
+
+        if pol == 'X':
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, 1+0j)
+        elif pol == 'Y':
+            sparam = (1+0j, 0j, 0j, amp*np.exp(1j*sp))
+        elif pol == 'XY':
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, amp*np.exp(1j*sp))
+        else:
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, amp*np.exp(1j*(sp-np.pi/2.0)))
+
+        ret.append(sparam)
 
     return ret
-
 
 def far_field_distance(freq, maxlen):
     """

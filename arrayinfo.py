@@ -95,8 +95,8 @@ class RAInfo:
                 erx += in_efield.item(0)
                 ery += in_efield.item(1)
             tc = np.matrix([
-                [0, 1],
-                [1, 0]
+                [1, 0],
+                [0, 1]
             ])
             s11, s12, s21, s22 = sp[i]
             d12 = tc*np.matrix([[erx], [ery]])
