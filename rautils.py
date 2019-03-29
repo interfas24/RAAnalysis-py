@@ -2,7 +2,7 @@ import numpy as np
 
 
 sol = 299792458   # speed of light    unit:m/s
-farR = 1e5
+farR = 10
 waveimpd = 119.9169832 * np.pi
 
 def distance(pt1, pt2):

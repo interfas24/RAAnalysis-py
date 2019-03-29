@@ -178,8 +178,62 @@ def focal_2bit_calculation():
         tsk3.post_process(integ, showFig, exfn='experiment/2bit/case{}_3d_theo.csv'.format(idx+1))
 
 
+
+def my_unit(pha, amp=1.0, bits=None, pol='Y'):
+    ret = []
+    for i in range(len(pha)):
+        sp = pha[i]
+        if bits != None:
+            step = np.pi*2/(2**bits)
+            sp = int(pha[i]/step) * step
+
+        if pol == 'X':
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, 1+0j)
+        elif pol == 'Y':
+            sparam = (1+0j, 0j, 0j, amp*np.exp(1j*sp))
+        elif pol == 'XY':
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, amp*np.exp(1j*sp))
+        else:
+            sparam = (amp*np.exp(1j*sp), 0j, 0j, amp*np.exp(1j*(sp-np.pi/2.0)))
+
+        ret.append(sparam)
+
+    return ret
+
+
+def RA_12x12():
+    freq = 5.0e9
+    cell_sz = 33 / 1000.
+    scale = 12
+    fdr = 0.9
+    hz = cell_sz*scale*fdr
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    showFig = True
+
+    integ = 30.17114    # 10.0, 5.0e9
+    horn = get_default_pyramidal_horn(freq)
+    pos = (0.0, 0.0, hz)
+    src = Source()
+    src.append(horn, abg, pos)
+
+    bs = 2
+    tmp = [(np.deg2rad(0), np.deg2rad(0))]
+    arr = RAInfo(src, cell_sz, (scale, scale), ('pencil', tmp), lambda p:ideal_ref_unit(p, bits=bs, amp=0.8))
+
+    solver = RASolver(arr)
+    tsk1 = Gain2D(np.deg2rad(0), 181)
+
+    solver.append_task(tsk1)
+
+    solver.run()
+
+    tsk1.post_process(integ, showFig, exfn='experiment/12x12/xoz-theo.csv')
+
+
 if __name__ == '__main__':
     #test_offset_feed()
     #line_feed_array()
     #linear_feed_pattern()
-    focal_2bit_calculation()
+    #focal_2bit_calculation()
+    RA_12x12()
+

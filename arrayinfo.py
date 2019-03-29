@@ -60,6 +60,8 @@ class RAInfo:
                 ret.append(v)
             distro.close()
             phase = np.array(ret)
+        elif key == 'selfdefine':
+            phase = val
         elif key == 'pencil':
             phase = bf.form_pencil_beam(val, fpos != None)
         elif key == 'oam':

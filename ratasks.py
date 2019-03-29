@@ -2,10 +2,8 @@ import numpy as np
 from rautils import farR, sph2car_mtx, make_v_mtx, dB, car2sph, waveimpd
 import threading
 import matplotlib.pyplot as plt
-
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import cmath
 
 class EfieldResult:
     def __init__(self, Etheta, Ephi, pos):
@@ -35,10 +33,15 @@ class EfieldResult:
     def get_gain(self, ipower):
         return 4*np.pi*np.abs(self.Etotal)*np.abs(self.Etotal) * farR * farR / (ipower * 2 * waveimpd)
 
-class TaskState:
-    Pending = 1
-    Calculating = 2
-    Finished = 3
+    def get_rE(self, type='total'):
+        (r, t, p) = self.Pos
+        if type == 'total':
+            return self.Etotal * r
+        elif type == 'theta':
+            return self.Etheta * r
+        elif type == 'phi':
+            return self.Ephi * r
+
 
 class Task:
     def __init__(self, oid, pos):
@@ -77,7 +80,6 @@ class Task:
 
 class FarZone:
     def __init__(self, row, col, freq=10e9):
-        self.state = TaskState.Pending
         self.row = row
         self.col = col
         self.nrow = len(row)
@@ -182,7 +184,8 @@ class Gain3D(FarZone):
             Z = gs * np.cos(T)
 
             fg = plt.figure()
-            ax = fg.gca(projection='3d')
+            #ax = fg.gca(projection='3d')
+            ax = fg.gca()
 
             surf = ax.plot_surface(X, Y, Z, cmap=cm.jet,
                                    rstride=1, cstride=1,
@@ -192,8 +195,81 @@ class Gain3D(FarZone):
             plt.show()
 
 
+class rE3D(FarZone):
+    def __init__(self, nphi, ntheta, freq=1e9):
+        self.ps = np.linspace(0, np.pi*2, nphi)
+        self.ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
+        super().__init__(self.ps, self.ts, freq)
+
+    def post_process(self, type='total', fig=False, mfn=None, pfn=None):
+        fields = np.reshape(self.alldat, (self.nrow, self.ncol))
+        gs = np.ndarray(shape=fields.shape, dtype=complex)
+
+        for (id, field) in list(enumerate(fields)):
+            g = [x.get_rE(type) for x in field]
+            gs[id,:] = np.array(g)
+
+
+        if mfn != None:
+            afile = open(mfn, 'w')
+            afile.write('Phi[deg],Theta[deg],mag(rETotal)[V]\n')
+            ps = np.rad2deg(self.row)
+            ts = np.rad2deg(self.col)
+            for i in range(self.ncol):
+                for j in range(self.nrow):  #j phi
+                    afile.write('{},{},{}\n'.format(ps[j], ts[i], np.abs(gs[j, i])))
+            afile.close()
+
+        if pfn != None:
+            afile = open(pfn, 'w')
+            afile.write('Phi[deg],Theta[deg],phase(rETotal)[deg]\n')
+            ps = np.rad2deg(self.row)
+            ts = np.rad2deg(self.col)
+            for i in range(self.ncol):
+                for j in range(self.nrow):  #j phi
+                    afile.write('{},{},{}\n'.format(ps[j], ts[i], np.angle(gs[j, i], deg=True)))
+            afile.close()
+
+        if fig:
+            ps = self.row
+            ts = self.col
+            T, P = np.meshgrid(ts, ps)
+
+            plt.figure()
+            plt.pcolor(np.sin(T)*np.cos(P), np.sin(T)*np.sin(P), np.abs(gs))
+            plt.colorbar()
+
+            plt.figure()
+            plt.pcolor(np.sin(T)*np.cos(P), np.sin(T)*np.sin(P), np.angle(gs, deg=True))
+            plt.colorbar()
+
+            plt.show()
+
+
 class Directivity2D(FarZone):
-    pass
+    def __init__(self, phi, ntheta, freq=10e9):
+        ts = np.linspace(-np.pi/2, np.pi/2, ntheta)
+        super().__init__([phi], ts, freq)
+
+    def post_process(self, integ, fig=False, exfn=None):
+        fields = np.reshape(self.alldat, (self.nrow, self.ncol))
+        gs = [x.get_directivity() for x in fields[0]]
+        gs = dB(gs)
+
+        if fig:
+            plt.figure()
+            plt.plot(self.col, gs)
+            plt.ylim(-30, 40)
+            plt.show()
+
+        if exfn != None:
+            afile = open(exfn, 'w')
+            afile.write('Theta[deg],dB(GainTotal)[] - Freq=\'{}GHz\' Phi=\'{}deg\'\n'
+                        .format(self.freq/1e9, np.rad2deg(self.row[0])))
+            ts = np.rad2deg(self.col)
+            for i in range(len(ts)):
+                afile.write('{},{}\n'.format(ts[i], gs[i]))
+            afile.close()
 
 class Directivity3D(FarZone):
     pass
@@ -274,7 +350,7 @@ class FresnelPlane:
             tsk.append(Task((b, e), pos))
             return tsk
 
-    def post_process(self, integ, fig=False, exfn=None):
+    def post_process(self, integ, fig=False, mfn=None, pfn = None):
         #fields = np.reshape(self.alldat, (self.Ny, self.Nx))
         mag, phase = [], []
         for dat in self.alldat:
@@ -297,6 +373,7 @@ class FresnelPlane:
             plt.colorbar()
             plt.show()
 
+        """
         if exfn != None:
             afile = open(exfn, 'w')
             afile.write('Grid Output Min: [{}m {}m {}m] Max: [{}m {}m {}m] Grid Size: [{}m {}m 0m] Points: [{} {}]\n'
@@ -308,6 +385,23 @@ class FresnelPlane:
             for i in range(len(mag)):
                 for j in range(len(mag[0])):
                     afile.write('{} {} {} {}\n'.format(self.ox[i], self.oy[j], self.r0, mag[i,j]))
+            afile.close()
+        """
+
+        if mfn != None:
+            afile = open(mfn, 'w')
+            afile.write('Phi[deg],Theta[deg],mag(rETotal)[V]\n')
+            for i in range(len(mag)):
+                for j in range(len(mag[0])):  #j phi
+                    afile.write('{},{},{}\n'.format(self.ox[i], self.oy[j], mag[i,j]))
+            afile.close()
+
+        if pfn != None:
+            afile = open(pfn, 'w')
+            afile.write('Phi[deg],Theta[deg],mag(rETotal)[V]\n')
+            for i in range(len(phase)):
+                for j in range(len(phase[0])):  #j phi
+                    afile.write('{},{},{}\n'.format(self.ox[i], self.oy[j], phase[i,j]))
             afile.close()
 
 

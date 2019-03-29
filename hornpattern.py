@@ -177,12 +177,12 @@ def get_default_pyramidal_horn(freq, E0=10.0, initp=0.0):
 
 
 def test_horn():
-    f = 5.0e9
-    cell_sz = 15. / 1000.
-    scale = 50
-    z = cell_sz*scale*1
+    f = 6.0e9
+    cell_sz = 25. / 1000.
+    scale = 20
+    z = cell_sz*scale*2.0
 
-    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f, initp=np.deg2rad(180))
+    phorn = PyramidalHorn(3.56, 5.08, 0.762, 0.3386, 1.524, 1.1854, 10, f, initp=np.deg2rad(0))
     xl, yl = create_array_pos(cell_sz, scale, scale, ex=True)
     magE = np.ndarray((len(yl), len(xl)))
     pE = np.ndarray((len(yl), len(xl)))
