@@ -2,7 +2,7 @@ from hornpattern import PyramidalHorn, get_default_pyramidal_horn, get_horn_inpu
 from arrayinfo import RAInfo
 from sources import PlaneWave, Source
 from rautils import gsinc, ideal_ref_unit, dB, sph2car_mtx, make_v_mtx, farR
-from ratasks import Gain2D, Gain3D, EfieldResult
+from ratasks import Gain2D, Gain3D, EfieldResult, NearFieldResult
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -20,10 +20,11 @@ import threading
 
 class RASolver:
 
-    def __init__(self, rainfo):
+    def __init__(self, rainfo, type='far'):
         self.rainfo = rainfo
         self.tasks = []
         self.lock = threading.Lock()
+        self.type = type
 
     def __erxy_fft(self, u, v):
         px, py = self.rainfo.get_pxy()
@@ -55,6 +56,20 @@ class RASolver:
 
         return EfieldResult(E_theta, E_phi, (r, t, p))
 
+    def __calc_near_point(self, x, y, z):
+        u = x / z
+        v = y / z
+
+        Erx, Ery = self.__erxy_fft(u, v)
+
+        k0 = self.rainfo.get_k0()
+        fact1 = (x*x+y*y)/2.0/z + z
+        fact2 = -2*z*z / (2*z*z - x*x - y*y)
+        Ex = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * Erx
+        Ey = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * Ery
+        Ez = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * fact2 * (x/z*Erx + y/z*Ery)
+
+        return NearFieldResult(Ex, Ey, Ez, (x, y, z))
 
     # add far zone task
     def append_task(self, tsk):
@@ -63,8 +78,11 @@ class RASolver:
     # calc a task in a thread
     def __calc_one_task__(self, tsk):
         #with self.lock:
-            for (r, t, p) in tsk:
-                tsk.set_current_result(self.__calc_one_point(r, t, p))
+            for (a, b, c) in tsk:
+                if self.type == 'far':
+                    tsk.set_current_result(self.__calc_one_point(a, b, c))
+                else:
+                    tsk.set_current_result(self.__calc_near_point(a, b, c)) # this is x y z actually
             return tsk
 
     # iterate on tasks, each task use multi-threading

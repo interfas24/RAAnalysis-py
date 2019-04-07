@@ -42,6 +42,21 @@ class EfieldResult:
         elif type == 'phi':
             return self.Ephi * r
 
+class NearFieldResult:
+    def __init__(self, Ex, Ey, Ez, pos):
+        self.Ex = Ex
+        self.Ey = Ey
+        self.Ez = Ez
+        self.Pos = pos
+        self.Etotal = np.sqrt(Ex*Ex + Ey*Ey + Ez*Ez)
+
+    def get_etotal(self):
+        return self.Etotal
+
+
+    def get_car_field(self):
+        return self.Ex, self.Ey, self.Ez
+
 
 class Task:
     def __init__(self, oid, pos):
@@ -305,7 +320,7 @@ class FresnelPlane:
         ox = np.linspace(-wx/2, wx/2, Nx)
         oy = np.linspace(-wy/2, wy/2, Ny)
         self.allpos = []
-        self.alldat = np.empty(Nx*Ny, dtype=EfieldResult)
+        self.alldat = np.empty(Nx*Ny, dtype=NearFieldResult)
         self.lock = threading.Lock()
         self.size = Nx*Ny
         self.Nx = Nx
@@ -319,8 +334,7 @@ class FresnelPlane:
                 oxyz = np.matrix([x, y, r0])
                 oxyz = np.transpose(oxyz)
                 xyz = rt * oxyz
-                R, T, P = car2sph(xyz.item(0), xyz.item(1), xyz.item(2))
-                self.allpos.append((R, T, P))
+                self.allpos.append((xyz.item(0), xyz.item(1), xyz.item(2)))
 
     def __len__(self):
         return self.size
@@ -333,7 +347,6 @@ class FresnelPlane:
 
     def assign_task(self, mp=200):
         if len(self) <= mp:
-            #pos = [(self.R, t, p) for t in self.col for p in self.row]
             return [Task((0, len(self)), self.allpos)]
         else:
             tsk = []
@@ -350,14 +363,13 @@ class FresnelPlane:
             tsk.append(Task((b, e), pos))
             return tsk
 
-    def post_process(self, integ, fig=False, mfn=None, pfn = None):
-        #fields = np.reshape(self.alldat, (self.Ny, self.Nx))
+    def post_process(self, fig=False, mfn=None, pfn = None):
         mag, phase = [], []
         for dat in self.alldat:
-            Ex, Ey, Ez = dat.get_car_field()
-            phase.append(np.angle(Ey))
-            #mag.append(np.abs(np.sqrt(Ex**2 + Ey**2 + Ez**2)))
-            mag.append(np.abs(np.sqrt(Ex*np.conj(Ex) + Ey*np.conj(Ey) + Ez*np.conj(Ez))))
+            total = dat.get_etotal()
+            ex, ey, ez = dat.get_car_field()
+            phase.append(np.angle(ey))
+            mag.append(np.abs(total))
 
         mag = np.reshape(mag, (self.Nx, self.Ny))
         phase = np.reshape(phase, (self.Nx, self.Ny))
@@ -373,20 +385,6 @@ class FresnelPlane:
             plt.colorbar()
             plt.show()
 
-        """
-        if exfn != None:
-            afile = open(exfn, 'w')
-            afile.write('Grid Output Min: [{}m {}m {}m] Max: [{}m {}m {}m] Grid Size: [{}m {}m 0m] Points: [{} {}]\n'
-                        'X, Y, Z, Scalar data "ComplexMag_E"\n'.format(
-                        self.ox[0], self.oy[0], self.r0,
-                        self.ox[-1], self.oy[-1], self.r0,
-                        self.ox[1]-self.ox[0], self.oy[1]-self.oy[0],
-                        self.Nx, self.Ny))
-            for i in range(len(mag)):
-                for j in range(len(mag[0])):
-                    afile.write('{} {} {} {}\n'.format(self.ox[i], self.oy[j], self.r0, mag[i,j]))
-            afile.close()
-        """
 
         if mfn != None:
             afile = open(mfn, 'w')
