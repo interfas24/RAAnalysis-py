@@ -4,7 +4,7 @@ from sources import Source
 from arrayinfo import RAInfo
 from rautils import ideal_ref_unit, waveimpd, dB, sph2car, R2F, make_v_mtx
 from rasolver import RASolver
-from ratasks import Gain2D, Gain3D, FresnelPlane, OnAxisLine
+from ratasks import Gain2D, Gain3D, FresnelPlane, OnAxisLine, PhiCutPlane
 import matplotlib.pyplot as plt
 import csv
 
@@ -340,8 +340,40 @@ def test_fresnel_onaxis():
     tsk.post_process(showFig, None)
 
 
+def test_fresnel_phicut():
+    freq = 6.0e9
+    cell_sz = 25 / 1000.
+    lmbd = 3e8 / freq
+    scale = 20
+    fdr = 0.8
+    hz = cell_sz*scale*fdr
+    horn = get_default_pyramidal_horn(freq)
+    pos = (0.0, 0.0, hz)
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    showFig = True
+
+    far_z = 2 * (scale*cell_sz*np.sqrt(2)) ** 2 / lmbd
+    focal = [(0.5, 0.5, 1.0, 1.0), (-0.5, -0.5, 1.0, 1.0)]
+
+    src = Source()
+    src.append(horn, abg, pos)
+
+    arr = RAInfo(src, cell_sz, (scale, scale), ('foci', focal), circle_unit)
+
+    solver = RASolver(arr, type='fresnel')
+
+    tsk = PhiCutPlane((2.0, 1.5), (21, 21), phi=np.deg2rad(45))
+
+    solver.append_task(tsk)
+
+    solver.run()
+
+    tsk.post_process(showFig, None)
+
+
 if __name__ == '__main__':
-    test_fresnel_plane()
+    test_fresnel_phicut()
+    #test_fresnel_plane()
     #test_fresnel_onaxis()
     #test_offset_feed()
     #line_feed_array()

@@ -367,8 +367,6 @@ class FresnelPlane:
         mag, phase = [], []
         for dat in self.alldat:
             total = dat.get_etotal()
-            ex, ey, ez = dat.get_car_field()
-            phase.append(np.angle(ey))
             mag.append(np.abs(total))
 
         mag = np.reshape(mag, (self.Nx, self.Ny))
@@ -382,7 +380,7 @@ class FresnelPlane:
 
         if mfn != None:
             afile = open(mfn, 'w')
-            afile.write('X[m],X[m],mag(ETotal)[V/m]\n')
+            afile.write('X[m],Y[m],mag(ETotal)[V/m]\n')
             for i in range(len(mag)):
                 for j in range(len(mag[0])):  #j phi
                     afile.write('{},{},{}\n'.format(self.ox[i], self.oy[j], mag[i,j]))
@@ -427,8 +425,6 @@ class OnAxisLine:
         mag, phase = [], []
         for dat in self.alldat:
             total = dat.get_etotal()
-            ex, ey, ez = dat.get_car_field()
-            phase.append(np.angle(ey))
             mag.append(np.abs(total))
 
         if fig:
@@ -442,6 +438,78 @@ class OnAxisLine:
             for idx in range(len(self)):
                 afile.write('{},{}\n'.format(self.zlist[idx], mag[idx]))
             afile.close()
+
+
+# FixMe coordinate bug
+class PhiCutPlane:
+    def __init__(self, wxz, Nxz, phi=0.0):
+        wx, wz = wxz
+        Nx, Nz = Nxz
+        ox = np.linspace(-wx/2.0, wx/2.0, Nx)
+        oz = np.linspace(1e-4, wz, Nz)
+        self.ox = ox
+        self.oz = oz
+        self.Nx = Nx
+        self.Nz = Nz
+        self.allpos = []
+        self.alldat = np.empty(Nx*Nz, dtype=NearFieldResult)
+        self.size = Nx * Nz
+        self.phi = phi - np.pi/2.0
+
+        for z in oz:
+            for x in ox:
+                nx, ny = x*np.cos(phi), x*np.sin(phi)
+                self.allpos.append((nx, ny, z))
+        print(ox)
+        print(oz)
+
+    def __len__(self):
+        return self.size
+
+    def set_results(self, tsk):
+        b, e = tsk.get_old_idx()
+        for i in range(b, e):
+            self.alldat.put(i, tsk.get_results()[i-b])
+
+    def assign_task(self, mp=200):
+        if len(self) <= mp:
+            return [Task((0, len(self)), self.allpos)]
+        else:
+            tsk = []
+            b, e = 0, 0
+            pos = []
+
+            for i in range(len(self)):
+                pos.append(self.allpos[i])
+                e += 1
+                if e - b == mp:
+                    tsk.append(Task((b, e), pos))
+                    pos = []
+                    b = e
+            tsk.append(Task((b, e), pos))
+            return tsk
+
+    def post_process(self, fig=False, mfn=None):
+        mag, phase = [], []
+        for dat in self.alldat:
+            total = dat.get_etotal()
+            mag.append(np.abs(total))
+
+        mag = np.reshape(mag, (self.Nz, self.Nx))
+        if fig:
+            plt.figure()
+            plt.pcolor(mag, cmap='jet')
+            plt.colorbar()
+            plt.show()
+
+        if mfn != None:
+            afile = open(mfn, 'w')
+            afile.write('X[m], Z[m],mag(ETotal)[V/m]\n')
+            for i in range(len(mag)):
+                for j in range(len(mag[0])):  #j phi
+                    afile.write('{},{},{}\n'.format(self.ox[i], self.oz[j], mag[i,j]))
+            afile.close()
+
 
 
 if __name__ == '__main__':
