@@ -363,7 +363,7 @@ class FresnelPlane:
             tsk.append(Task((b, e), pos))
             return tsk
 
-    def post_process(self, fig=False, mfn=None, pfn = None):
+    def post_process(self, fig=False, mfn=None):
         mag, phase = [], []
         for dat in self.alldat:
             total = dat.get_etotal()
@@ -372,7 +372,6 @@ class FresnelPlane:
             mag.append(np.abs(total))
 
         mag = np.reshape(mag, (self.Nx, self.Ny))
-        phase = np.reshape(phase, (self.Nx, self.Ny))
 
         if fig:
             plt.figure()
@@ -380,26 +379,68 @@ class FresnelPlane:
             plt.colorbar()
             plt.show()
 
-            plt.figure()
-            plt.pcolor(self.ox, self.oy, phase, cmap='jet')
-            plt.colorbar()
-            plt.show()
-
 
         if mfn != None:
             afile = open(mfn, 'w')
-            afile.write('Phi[deg],Theta[deg],mag(rETotal)[V]\n')
+            afile.write('X[m],X[m],mag(ETotal)[V/m]\n')
             for i in range(len(mag)):
                 for j in range(len(mag[0])):  #j phi
                     afile.write('{},{},{}\n'.format(self.ox[i], self.oy[j], mag[i,j]))
             afile.close()
 
-        if pfn != None:
-            afile = open(pfn, 'w')
-            afile.write('Phi[deg],Theta[deg],mag(rETotal)[V]\n')
-            for i in range(len(phase)):
-                for j in range(len(phase[0])):  #j phi
-                    afile.write('{},{},{}\n'.format(self.ox[i], self.oy[j], phase[i,j]))
+
+class OnAxisLine:
+    def __init__(self, zlist, zrio):
+        self.allpos = [(0.0, 0.0, z) for z in zlist]
+        self.alldat = np.empty(len(zlist), dtype=NearFieldResult)
+        self.size = len(zlist)
+        self.zlist = zlist
+        self.zrio = zrio
+
+    def __len__(self):
+        return self.size
+
+    def set_results(self, tsk):
+        b, e = tsk.get_old_idx()
+        for i in range(b, e):
+            self.alldat.put(i, tsk.get_results()[i-b])
+
+    def assign_task(self, mp=200):
+        if len(self) <= mp:
+            return [Task((0, len(self)), self.allpos)]
+        else:
+            tsk = []
+            b, e = 0, 0
+            pos = []
+
+            for i in range(len(self)):
+                pos.append(self.allpos[i])
+                e += 1
+                if e - b == mp:
+                    tsk.append(Task((b, e), pos))
+                    pos = []
+                    b = e
+            tsk.append(Task((b, e), pos))
+            return tsk
+
+    def post_process(self, fig=False, mfn=None):
+        mag, phase = [], []
+        for dat in self.alldat:
+            total = dat.get_etotal()
+            ex, ey, ez = dat.get_car_field()
+            phase.append(np.angle(ey))
+            mag.append(np.abs(total))
+
+        if fig:
+            plt.figure()
+            plt.plot(self.zrio, mag)
+            plt.show()
+
+        if mfn != None:
+            afile = open(mfn, 'w')
+            afile.write('Z[m],mag(ETotal)[V/m]\n')
+            for idx in range(len(self)):
+                afile.write('{},{}\n'.format(self.zlist[idx], mag[idx]))
             afile.close()
 
 

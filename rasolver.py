@@ -1,7 +1,7 @@
 from hornpattern import PyramidalHorn, get_default_pyramidal_horn, get_horn_input_power
 from arrayinfo import RAInfo
 from sources import PlaneWave, Source
-from rautils import gsinc, ideal_ref_unit, dB, sph2car_mtx, make_v_mtx, farR
+from rautils import gsinc, ideal_ref_unit, dB, sph2car_mtx, make_v_mtx, farR, Fresnel
 from ratasks import Gain2D, Gain3D, EfieldResult, NearFieldResult
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,18 +56,28 @@ class RASolver:
 
         return EfieldResult(E_theta, E_phi, (r, t, p))
 
-    def __calc_near_point(self, x, y, z):
-        u = x / z
-        v = y / z
-
-        Erx, Ery = self.__erxy_fft(u, v)
+    def __calc_fresnel_point(self, x, y, z):
+        Ex, Ey, Ez = 0j, 0j, 0j
+        px, py = self.rainfo.get_pxy()
+        Nx, Ny = self.rainfo.get_Nxy()
 
         k0 = self.rainfo.get_k0()
-        fact1 = (x*x+y*y)/2.0/z + z
-        fact2 = -2*z*z / (2*z*z - x*x - y*y)
-        Ex = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * Erx
-        Ey = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * Ery
-        Ez = 1j*k0*np.exp(-1j*k0*fact1)/(2*np.pi*z) * fact2 * (x/z*Erx + y/z*Ery)
+
+        integ_sum = 0j
+
+        for (i, (Exmn, Eymn)) in list(enumerate(self.rainfo)):
+            m, n = int(i / Nx), int(i % Nx)
+            A = m*px - (Nx-1)*px/2
+            B = n*py - (Ny-1)*py/2
+            t2 = (-px/2+x-A) * np.sqrt(k0/(np.pi*z))
+            t1 = (px/2+x-A) * np.sqrt(k0/(np.pi*z))
+            t2p = (-py/2+y-B) * np.sqrt(k0/(np.pi*z))
+            t1p = (py/2+y-B) * np.sqrt(k0/(np.pi*z))
+            Ix = Fresnel(t2) - Fresnel(t1)
+            Iy = Fresnel(t2p) - Fresnel(t1p)
+            integ_sum += Eymn * Ix * Iy
+
+        Ey = 1j/2.0 * np.exp(-1j*k0*z) * integ_sum
 
         return NearFieldResult(Ex, Ey, Ez, (x, y, z))
 
@@ -81,8 +91,10 @@ class RASolver:
             for (a, b, c) in tsk:
                 if self.type == 'far':
                     tsk.set_current_result(self.__calc_one_point(a, b, c))
+                elif self.type == 'fresnel':
+                    tsk.set_current_result(self.__calc_fresnel_point(a, b, c)) # this is x y z actually
                 else:
-                    tsk.set_current_result(self.__calc_near_point(a, b, c)) # this is x y z actually
+                    raise ValueError('type error')
             return tsk
 
     # iterate on tasks, each task use multi-threading

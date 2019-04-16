@@ -4,8 +4,9 @@ from sources import Source
 from arrayinfo import RAInfo
 from rautils import ideal_ref_unit, waveimpd, dB, sph2car, R2F, make_v_mtx
 from rasolver import RASolver
-from ratasks import Gain2D, Gain3D, FresnelPlane
+from ratasks import Gain2D, Gain3D, FresnelPlane, OnAxisLine
 import matplotlib.pyplot as plt
+import csv
 
 
 def test_offset_feed():
@@ -178,7 +179,6 @@ def focal_2bit_calculation():
         tsk3.post_process(integ, showFig, exfn='experiment/2bit/case{}_3d_theo.csv'.format(idx+1))
 
 
-
 def my_unit(pha, amp=1.0, bits=None, pol='Y'):
     ret = []
     for i in range(len(pha)):
@@ -230,10 +230,122 @@ def RA_12x12():
     tsk1.post_process(integ, showFig, exfn='experiment/12x12/xoz-theo.csv')
 
 
+def circle_unit_data_table():
+    fn = 'experiment/s11tetm-circle.csv'
+    data_table = []
+    csvf = open(fn)
+    sparam = csv.reader(csvf)
+    for row in sparam:
+        row = [float(s) for s in row]
+        d = []
+        for i in range(4):
+            d.append(row[i*2] + 1j*row[i*2+1])
+        data_table.append(d)
+        #print(d)
+    rad_list = []
+    for s in data_table:
+        rad_list.append(np.angle(s[0]))
+    #print(rad_list)
+    csvf.close()
+    return data_table, rad_list
+
+sparam_dt, s11_rads = circle_unit_data_table()
+
+def get_sparam_line_idx(rad):
+    rad -= np.pi
+    if rad > s11_rads[0]:
+        return 0
+    elif rad < s11_rads[-1]:
+        return len(s11_rads) - 1
+    for i in range(len(s11_rads)-1):
+        if rad < s11_rads[i] and rad > s11_rads[i+1]:
+            mid = (s11_rads[i] + s11_rads[i+1]) / 2.0
+            if rad >= (mid):
+                return i
+            else:
+                return i+1
+
+def circle_unit(pha):
+    ret = []
+    for i in range(len(pha)):
+        p = pha[i]
+        idx = get_sparam_line_idx(p)
+        ret.append(sparam_dt[idx])
+
+    return ret
+
+
+
+def test_fresnel_plane():
+    freq = 6.0e9
+    cell_sz = 25 / 1000.
+    lmbd = 3e8 / freq
+    scale = 20
+    fdr = 0.8
+    hz = cell_sz*scale*fdr
+    horn = get_default_pyramidal_horn(freq)
+    pos = (0.0, 0.0, hz)
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    showFig = True
+
+    far_z = 2 * (scale*cell_sz*np.sqrt(2)) ** 2 / lmbd
+    focal = [(0.0, 0.0, 5.0, 1.0)]
+
+    src = Source()
+    src.append(horn, abg, pos)
+
+    arr = RAInfo(src, cell_sz, (scale, scale), ('foci', focal), circle_unit)
+
+    solver = RASolver(arr, type='fresnel')
+
+    tsk = FresnelPlane(0, 'xx', 5.0, (1.0, 1.0), (41, 41))
+    solver.append_task(tsk)
+
+    solver.run()
+
+    tsk.post_process(showFig, None)
+
+
+def test_fresnel_onaxis():
+    freq = 6.0e9
+    cell_sz = 25 / 1000.
+    lmbd = 3e8 / freq
+    scale = 20
+    fdr = 0.8
+    hz = cell_sz*scale*fdr
+    horn = get_default_pyramidal_horn(freq)
+    pos = (0.0, 0.0, hz)
+    abg = (np.deg2rad(180), np.deg2rad(180), np.deg2rad(0))
+    showFig = True
+    far_z = 2 * (scale*cell_sz*np.sqrt(2)) ** 2 / lmbd
+
+    focal_rio = 0.1
+    focal = [(0.0, 0.0, focal_rio*far_z, 1.0)]
+
+    src = Source()
+    src.append(horn, abg, pos)
+
+    arr = RAInfo(src, cell_sz, (scale, scale), ('foci', focal), circle_unit)
+
+    solver = RASolver(arr, type='fresnel')
+
+    plane_rio = np.linspace(0.01, 0.5, 200)
+    zlist = [pr*far_z for pr in plane_rio]
+
+    tsk = OnAxisLine(zlist, plane_rio)
+    solver.append_task(tsk)
+
+    solver.run()
+
+    tsk.post_process(showFig, None)
+
+
 if __name__ == '__main__':
+    test_fresnel_plane()
+    #test_fresnel_onaxis()
     #test_offset_feed()
     #line_feed_array()
     #linear_feed_pattern()
     #focal_2bit_calculation()
-    RA_12x12()
+    #RA_12x12()
 
